@@ -8,13 +8,22 @@ import {
   MAX_FILE_SIZE_BYTES,
   MAX_FILES_PER_ORDER,
 } from "@/lib/utils/constants";
-import type { Shop } from "@/types";
+import type { Shop, UserProfile } from "@/types";
 
-export function UploadOrderForm({ shop }: { shop: Shop }) {
+export function UploadOrderForm({
+  shop,
+  profile,
+}: {
+  shop: Shop;
+  profile: UserProfile;
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
+  const [printType, setPrintType] = useState<"color" | "black_white">("black_white");
+  const [sideType, setSideType] = useState<"single_side" | "double_side">("single_side");
+  const [copies, setCopies] = useState(1);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -80,6 +89,9 @@ export function UploadOrderForm({ shop }: { shop: Shop }) {
       }
 
       form.reset();
+      setPrintType("black_white");
+      setSideType("single_side");
+      setCopies(1);
       setSuccess("Documents uploaded and order created successfully.");
       router.refresh();
     } catch (submissionError) {
@@ -110,21 +122,43 @@ export function UploadOrderForm({ shop }: { shop: Shop }) {
           <label className="label" htmlFor="customerName">
             Customer name
           </label>
-          <input id="customerName" name="customerName" className="input" required />
+          <input
+            id="customerName"
+            name="customerName"
+            className="input"
+            defaultValue={profile.name}
+            required
+          />
         </div>
 
-        <div>
-          <label className="label" htmlFor="customerPhone">
-            Phone number
-          </label>
-          <input id="customerPhone" name="customerPhone" className="input" required />
-        </div>
+        {profile.phone ? (
+          <input type="hidden" name="customerPhone" value={profile.phone} />
+        ) : (
+          <div>
+            <label className="label" htmlFor="customerPhone">
+              Phone number
+            </label>
+            <input
+              id="customerPhone"
+              name="customerPhone"
+              className="input"
+              placeholder="Saved after your first order"
+              required
+            />
+          </div>
+        )}
 
         <div>
           <label className="label" htmlFor="printType">
             Print type
           </label>
-          <select id="printType" name="printType" className="input" defaultValue="black_white">
+          <select
+            id="printType"
+            name="printType"
+            className="input"
+            value={printType}
+            onChange={(event) => setPrintType(event.target.value as "color" | "black_white")}
+          >
             <option value="black_white">Black &amp; white</option>
             <option value="color">Color</option>
           </select>
@@ -134,7 +168,15 @@ export function UploadOrderForm({ shop }: { shop: Shop }) {
           <label className="label" htmlFor="sideType">
             Side type
           </label>
-          <select id="sideType" name="sideType" className="input" defaultValue="single_side">
+          <select
+            id="sideType"
+            name="sideType"
+            className="input"
+            value={sideType}
+            onChange={(event) =>
+              setSideType(event.target.value as "single_side" | "double_side")
+            }
+          >
             <option value="single_side">Single side</option>
             <option value="double_side">Double side</option>
           </select>
@@ -149,7 +191,8 @@ export function UploadOrderForm({ shop }: { shop: Shop }) {
             name="copies"
             type="number"
             min="1"
-            defaultValue="1"
+            value={copies}
+            onChange={(event) => setCopies(Number(event.target.value) || 1)}
             className="input"
             required
           />

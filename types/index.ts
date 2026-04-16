@@ -1,6 +1,7 @@
 export type UserRole = "customer" | "shop_owner";
 
-export type OrderStatus = "pending" | "downloaded" | "completed";
+export type OrderStatus = "pending" | "completed";
+export type PaymentStatus = "unpaid" | "paid";
 
 export type PrintType = "color" | "black_white";
 
@@ -11,6 +12,7 @@ export interface UserProfile {
   name: string;
   email: string;
   role: UserRole;
+  phone?: string;
   createdAt?: string | null;
 }
 
@@ -21,6 +23,13 @@ export interface Shop {
   address: string;
   phone: string;
   description: string;
+  services: string[];
+  pricing: {
+    blackWhiteSingle: number;
+    blackWhiteDouble: number;
+    colorSingle: number;
+    colorDouble: number;
+  };
   createdAt?: string | null;
 }
 
@@ -34,6 +43,11 @@ export interface Order {
   printType: PrintType;
   sideType: SideType;
   copies: number;
+  finalAmount?: number | null;
+  paymentStatus: PaymentStatus;
+  razorpayOrderId?: string | null;
+  razorpayPaymentId?: string | null;
+  paidAt?: string | null;
   status: OrderStatus;
   createdAt?: string | null;
 }

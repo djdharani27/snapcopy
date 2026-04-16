@@ -1,11 +1,8 @@
-import type { OrderStatus, SideType, PrintType, UserRole } from "@/types";
+import type { OrderStatus, SideType, PrintType, UserRole, PaymentStatus } from "@/types";
 
 export const USER_ROLES: UserRole[] = ["customer", "shop_owner"];
-export const ORDER_STATUSES: OrderStatus[] = [
-  "pending",
-  "downloaded",
-  "completed",
-];
+export const ORDER_STATUSES: OrderStatus[] = ["pending", "completed"];
+export const PAYMENT_STATUSES: PaymentStatus[] = ["unpaid", "paid"];
 export const PRINT_TYPES: PrintType[] = ["color", "black_white"];
 export const SIDE_TYPES: SideType[] = ["single_side", "double_side"];
 

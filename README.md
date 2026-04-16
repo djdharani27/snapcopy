@@ -23,7 +23,8 @@ Lean Xerox / print-shop marketplace MVP built with Next.js App Router, Firebase 
 - Firestore storage for users, shops, orders, and order files metadata
 - Shop owner dashboard with incoming orders
 - Download links generated as short-lived signed S3 URLs
-- Order status updates: `pending`, `downloaded`, `completed`
+- Order status updates: `pending`, `completed`
+- Razorpay payment collection into your platform account first
 
 ## Architecture decisions
 
@@ -63,6 +64,11 @@ Use a Firebase service account from your project settings. Keep the private key 
 - `AWS_REGION`
 - `AWS_S3_BUCKET_NAME`
 - `AWS_S3_ENDPOINT` (optional, only if your bucket requires an explicit endpoint)
+
+### Razorpay
+
+- `NEXT_PUBLIC_RAZORPAY_KEY_ID`
+- `RAZORPAY_KEY_SECRET`
 
 ## Local setup
 
@@ -107,7 +113,12 @@ Use a Firebase service account from your project settings. Keep the private key 
 - `printType`: `color | black_white`
 - `sideType`: `single_side | double_side`
 - `copies`: number
-- `status`: `pending | downloaded | completed`
+- `status`: `pending | completed`
+- `finalAmount`: number or null
+- `paymentStatus`: `unpaid | paid`
+- `razorpayOrderId`: string or null
+- `razorpayPaymentId`: string or null
+- `paidAt`: timestamp or null
 - `createdAt`: timestamp
 
 ### `order_files`
@@ -161,10 +172,10 @@ Deploy [firestore.indexes.json](/C:/Users/gearz/OneDrive/Documents/New----CODE/A
 - This MVP assumes Node.js runtime for S3 uploads.
 - On Vercel or similar platforms, add the same env vars in project settings.
 - If Firebase Admin is missing, protected routes and API uploads will fail by design.
+- Razorpay payments are collected into your platform account first. Paying shop owners at the end of the day is an offline settlement step outside this MVP.
 
 ## Limitations by design
 
-- No payment flow
 - No delivery tracking
 - No chat
 - No admin panel

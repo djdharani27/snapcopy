@@ -15,7 +15,7 @@ export async function PATCH(
   try {
     const { decoded } = await requireApiRole("shop_owner");
     const { orderId } = await context.params;
-    const { status } = await request.json();
+    const { status, finalAmount } = await request.json();
 
     if (!ORDER_STATUSES.includes(status)) {
       return NextResponse.json({ error: "Invalid status." }, { status: 400 });
@@ -28,7 +28,26 @@ export async function PATCH(
       return NextResponse.json({ error: "Order not found." }, { status: 404 });
     }
 
-    const updatedOrder = await updateOrderStatus(orderId, status as OrderStatus);
+    if (status !== "completed") {
+      return NextResponse.json(
+        { error: "Only completion is supported." },
+        { status: 400 },
+      );
+    }
+
+    const numericFinalAmount = Number(finalAmount);
+    if (Number.isNaN(numericFinalAmount) || numericFinalAmount < 0) {
+      return NextResponse.json(
+        { error: "Valid final amount is required." },
+        { status: 400 },
+      );
+    }
+
+    const updatedOrder = await updateOrderStatus(
+      orderId,
+      status as OrderStatus,
+      numericFinalAmount,
+    );
     return NextResponse.json({ order: updatedOrder });
   } catch (error) {
     return NextResponse.json(

@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { requireApiRole } from "@/lib/auth/session";
-import { createOrderWithFiles, getShopById } from "@/lib/firebase/firestore-admin";
+import {
+  createOrderWithFiles,
+  getShopById,
+  upsertUserProfile,
+} from "@/lib/firebase/firestore-admin";
 import { PRINT_TYPES, SIDE_TYPES } from "@/lib/utils/constants";
 
 export async function POST(request: Request) {
   try {
-    const { decoded } = await requireApiRole("customer");
+    const { decoded, profile } = await requireApiRole("customer");
     const {
       customerName,
       customerPhone,
@@ -17,7 +21,9 @@ export async function POST(request: Request) {
       files,
     } = await request.json();
 
-    if (!customerName || !customerPhone || !shopId || !Array.isArray(files) || files.length === 0) {
+    const resolvedCustomerPhone = String(customerPhone || profile.phone || "").trim();
+
+    if (!customerName || !resolvedCustomerPhone || !shopId || !Array.isArray(files) || files.length === 0) {
       return NextResponse.json(
         { error: "Customer details, shop, and files are required." },
         { status: 400 },
@@ -61,11 +67,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Shop not found." }, { status: 404 });
     }
 
+    await upsertUserProfile({
+      uid: decoded.uid,
+      name: String(customerName).trim(),
+      email: decoded.email || "",
+      role: "customer",
+      phone: resolvedCustomerPhone,
+    });
+
     const order = await createOrderWithFiles({
       customerId: decoded.uid,
       shopId: shop.id,
       customerName: String(customerName).trim(),
-      customerPhone: String(customerPhone).trim(),
+      customerPhone: resolvedCustomerPhone,
       notes: String(notes || "").trim(),
       printType,
       sideType,

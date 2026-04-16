@@ -1,22 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatDate, formatFileSize, statusClassName, statusLabel } from "@/lib/utils/format";
+import {
+  formatCurrency,
+  formatDate,
+  formatFileSize,
+  statusClassName,
+  statusLabel,
+} from "@/lib/utils/format";
 import type { OrderStatus, OrderWithFiles } from "@/types";
 
 export function OrdersTable({ orders }: { orders: OrderWithFiles[] }) {
   const router = useRouter();
+  const [localOrders, setLocalOrders] = useState<OrderWithFiles[]>(orders);
   const [updatingOrderId, setUpdatingOrderId] = useState("");
+  const [completionAmounts, setCompletionAmounts] = useState<Record<string, string>>(
+    () =>
+      Object.fromEntries(
+        orders.map((order) => [
+          order.id,
+          String(order.finalAmount ?? ""),
+        ]),
+      ),
+  );
+
+  useEffect(() => {
+    setLocalOrders(orders);
+    setCompletionAmounts(
+      Object.fromEntries(
+        orders.map((order) => [order.id, String(order.finalAmount ?? "")]),
+      ),
+    );
+  }, [orders]);
 
   async function handleStatusChange(orderId: string, status: OrderStatus) {
     setUpdatingOrderId(orderId);
 
     try {
+      const finalAmount = Number(completionAmounts[orderId]);
+      if (status === "completed" && (Number.isNaN(finalAmount) || finalAmount < 0)) {
+        throw new Error("Enter a valid final amount before completing the order.");
+      }
+
       const response = await fetch(`/api/orders/${orderId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, finalAmount }),
       });
 
       if (!response.ok) {
@@ -24,6 +54,14 @@ export function OrdersTable({ orders }: { orders: OrderWithFiles[] }) {
         throw new Error(payload.error || "Unable to update status.");
       }
 
+      const payload = await response.json();
+      if (payload.order) {
+        setLocalOrders((current) =>
+          current.map((order) =>
+            order.id === orderId ? { ...order, ...payload.order } : order,
+          ),
+        );
+      }
       router.refresh();
     } catch (error) {
       window.alert(
@@ -34,7 +72,7 @@ export function OrdersTable({ orders }: { orders: OrderWithFiles[] }) {
     }
   }
 
-  if (orders.length === 0) {
+  if (localOrders.length === 0) {
     return (
       <div className="panel p-8 text-center text-sm text-slate-600">
         No print requests yet.
@@ -44,7 +82,7 @@ export function OrdersTable({ orders }: { orders: OrderWithFiles[] }) {
 
   return (
     <div className="space-y-4">
-      {orders.map((order) => (
+      {localOrders.map((order) => (
         <article key={order.id} className="panel overflow-hidden">
           <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 md:flex-row md:items-start md:justify-between">
             <div>
@@ -62,6 +100,16 @@ export function OrdersTable({ orders }: { orders: OrderWithFiles[] }) {
               <p className="mt-2 text-sm text-slate-500">
                 Received {formatDate(order.createdAt)}
               </p>
+              {order.finalAmount !== null && order.finalAmount !== undefined ? (
+                <p className="mt-2 text-sm font-semibold text-emerald-700">
+                  Final amount: {formatCurrency(order.finalAmount)}
+                </p>
+              ) : null}
+              {order.paymentStatus === "paid" ? (
+                <p className="mt-2 text-sm font-semibold text-emerald-700">
+                  Paid by customer
+                </p>
+              ) : null}
             </div>
 
             <div className="grid gap-3 text-sm text-slate-600 md:text-right">
@@ -108,22 +156,42 @@ export function OrdersTable({ orders }: { orders: OrderWithFiles[] }) {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <label className="label" htmlFor={`status-${order.id}`}>
-                Update status
-              </label>
-              <select
-                id={`status-${order.id}`}
-                className="input"
-                defaultValue={order.status}
-                disabled={updatingOrderId === order.id}
-                onChange={(event) =>
-                  handleStatusChange(order.id, event.target.value as OrderStatus)
-                }
-              >
-                <option value="pending">Pending</option>
-                <option value="downloaded">Downloaded</option>
-                <option value="completed">Completed</option>
-              </select>
+              {order.status === "completed" ? (
+                <>
+                  <p className="label">Completed</p>
+                  <p className="text-sm text-slate-600">
+                    Customer can now see the final amount.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <label className="label" htmlFor={`amount-${order.id}`}>
+                    Final amount
+                  </label>
+                  <input
+                    id={`amount-${order.id}`}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className="input"
+                    value={completionAmounts[order.id] ?? ""}
+                    onChange={(event) =>
+                      setCompletionAmounts((current) => ({
+                        ...current,
+                        [order.id]: event.target.value,
+                      }))
+                    }
+                  />
+                  <button
+                    type="button"
+                    disabled={updatingOrderId === order.id}
+                    onClick={() => void handleStatusChange(order.id, "completed")}
+                    className="btn-primary mt-4 w-full"
+                  >
+                    {updatingOrderId === order.id ? "Saving..." : "Printed"}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </article>

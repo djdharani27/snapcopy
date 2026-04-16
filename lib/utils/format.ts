@@ -11,14 +11,25 @@ export function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+export function formatCurrency(amount: number) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(amount || 0);
+}
+
 export function statusLabel(status: OrderStatus) {
-  if (status === "downloaded") return "Downloaded";
   if (status === "completed") return "Completed";
   return "Pending";
 }
 
+export function customerStatusLabel(status: OrderStatus) {
+  if (status === "completed") return "Printed";
+  return "Order sent";
+}
+
 export function statusClassName(status: OrderStatus) {
-  if (status === "downloaded") return "status-downloaded";
   if (status === "completed") return "status-completed";
   return "status-pending";
 }

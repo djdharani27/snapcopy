@@ -5,7 +5,6 @@ import {
   getOrderById,
   getOrderFileById,
   getShopByOwnerId,
-  updateOrderStatus,
 } from "@/lib/firebase/firestore-admin";
 
 export async function GET(
@@ -26,10 +25,6 @@ export async function GET(
     const order = await getOrderById(file.orderId);
     if (!order || order.shopId !== shop.id) {
       return NextResponse.json({ error: "File not found." }, { status: 404 });
-    }
-
-    if (order.status === "pending") {
-      await updateOrderStatus(order.id, "downloaded");
     }
 
     const url = await getDownloadUrl(file.s3Key);

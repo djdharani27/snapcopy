@@ -1,11 +1,15 @@
+import { unstable_noStore as noStore } from "next/cache";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AutoRefresh } from "@/components/shop-owner/auto-refresh";
 import { OrdersTable } from "@/components/shop-owner/orders-table";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { requireRole } from "@/lib/auth/session";
 import { getOrdersForShop, getShopByOwnerId } from "@/lib/firebase/firestore-admin";
 
 export default async function ShopOwnerDashboardPage() {
+  noStore();
+
   const { decoded, profile } = await requireRole("shop_owner");
   const shop = await getShopByOwnerId(decoded.uid);
 
@@ -26,6 +30,7 @@ export default async function ShopOwnerDashboardPage() {
         </Link>
       }
     >
+      <AutoRefresh />
       <div className="mb-5 grid gap-5 md:grid-cols-3">
         <div className="panel p-5">
           <p className="text-sm text-slate-500">Shop</p>

@@ -24,7 +24,35 @@ function mapDoc<T>(id: string, data: FirebaseFirestore.DocumentData) {
     id,
     ...data,
     createdAt: timestampToIso(data.createdAt),
+    paidAt: timestampToIso(data.paidAt),
   } as T;
+}
+
+function normalizeShop(shop: Shop): Shop {
+  return {
+    ...shop,
+    services: Array.isArray(shop.services) ? shop.services : [],
+    pricing: {
+      blackWhiteSingle: Number(shop.pricing?.blackWhiteSingle || 0),
+      blackWhiteDouble: Number(shop.pricing?.blackWhiteDouble || 0),
+      colorSingle: Number(shop.pricing?.colorSingle || 0),
+      colorDouble: Number(shop.pricing?.colorDouble || 0),
+    },
+  };
+}
+
+function normalizeOrder(order: Order): Order {
+  return {
+    ...order,
+    finalAmount:
+      order.finalAmount === null || order.finalAmount === undefined
+        ? null
+        : Number(order.finalAmount),
+    paymentStatus: order.paymentStatus || "unpaid",
+    razorpayOrderId: order.razorpayOrderId || null,
+    razorpayPaymentId: order.razorpayPaymentId || null,
+    paidAt: order.paidAt || null,
+  };
 }
 
 export async function getUserProfileById(uid: string) {
@@ -38,6 +66,7 @@ export async function upsertUserProfile(params: {
   name: string;
   email: string;
   role: UserRole;
+  phone?: string;
 }) {
   const ref = adminDb().collection("users").doc(params.uid);
   const snapshot = await ref.get();
@@ -48,6 +77,7 @@ export async function upsertUserProfile(params: {
       name: params.name,
       email: params.email,
       role: params.role,
+      ...(params.phone ? { phone: params.phone } : {}),
       createdAt: snapshot.exists ? snapshot.data()?.createdAt : FieldValue.serverTimestamp(),
     },
     { merge: true },
@@ -62,13 +92,13 @@ export async function getAllShops() {
     .orderBy("shopName", "asc")
     .get();
 
-  return snapshot.docs.map((doc) => mapDoc<Shop>(doc.id, doc.data()));
+  return snapshot.docs.map((doc) => normalizeShop(mapDoc<Shop>(doc.id, doc.data())));
 }
 
 export async function getShopById(shopId: string) {
   const snapshot = await adminDb().collection("shops").doc(shopId).get();
   if (!snapshot.exists) return null;
-  return mapDoc<Shop>(snapshot.id, snapshot.data() ?? {});
+  return normalizeShop(mapDoc<Shop>(snapshot.id, snapshot.data() ?? {}));
 }
 
 export async function getShopByOwnerId(ownerId: string) {
@@ -80,7 +110,7 @@ export async function getShopByOwnerId(ownerId: string) {
 
   if (snapshot.empty) return null;
   const doc = snapshot.docs[0];
-  return mapDoc<Shop>(doc.id, doc.data());
+  return normalizeShop(mapDoc<Shop>(doc.id, doc.data()));
 }
 
 export async function createShop(params: {
@@ -89,6 +119,8 @@ export async function createShop(params: {
   address: string;
   phone: string;
   description: string;
+  services: string[];
+  pricing: Shop["pricing"];
 }) {
   const existing = await getShopByOwnerId(params.ownerId);
   if (existing) {
@@ -103,10 +135,42 @@ export async function createShop(params: {
     address: params.address,
     phone: params.phone,
     description: params.description,
+    services: params.services,
+    pricing: params.pricing,
     createdAt: FieldValue.serverTimestamp(),
   });
 
   return getShopById(ref.id);
+}
+
+export async function updateShop(params: {
+  shopId: string;
+  ownerId: string;
+  shopName: string;
+  address: string;
+  phone: string;
+  description: string;
+  services: string[];
+  pricing: Shop["pricing"];
+}) {
+  const existing = await getShopById(params.shopId);
+  if (!existing || existing.ownerId !== params.ownerId) {
+    throw new Error("Shop not found.");
+  }
+
+  await adminDb().collection("shops").doc(params.shopId).set(
+    {
+      shopName: params.shopName,
+      address: params.address,
+      phone: params.phone,
+      description: params.description,
+      services: params.services,
+      pricing: params.pricing,
+    },
+    { merge: true },
+  );
+
+  return getShopById(params.shopId);
 }
 
 export async function createOrderWithFiles(params: {
@@ -134,6 +198,11 @@ export async function createOrderWithFiles(params: {
     printType: params.printType,
     sideType: params.sideType,
     copies: params.copies,
+    finalAmount: null,
+    paymentStatus: "unpaid",
+    razorpayOrderId: null,
+    razorpayPaymentId: null,
+    paidAt: null,
     status: "pending",
     createdAt: FieldValue.serverTimestamp(),
   });
@@ -161,7 +230,7 @@ export async function getOrderById(orderId: string) {
   const snapshot = await adminDb().collection("orders").doc(orderId).get();
   if (!snapshot.exists) return null;
 
-  const order = mapDoc<Order>(snapshot.id, snapshot.data() ?? {});
+  const order = normalizeOrder(mapDoc<Order>(snapshot.id, snapshot.data() ?? {}));
   const files = await getFilesByOrderIds([orderId]);
 
   return {
@@ -207,7 +276,7 @@ export async function getOrdersForShop(shopId: string) {
     .get();
 
   const orders = snapshot.docs
-    .map((doc) => mapDoc<Order>(doc.id, doc.data()))
+    .map((doc) => normalizeOrder(mapDoc<Order>(doc.id, doc.data())))
     .sort((a, b) => {
       const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -221,9 +290,77 @@ export async function getOrdersForShop(shopId: string) {
   })) as OrderWithFiles[];
 }
 
-export async function updateOrderStatus(orderId: string, status: OrderStatus) {
-  await adminDb().collection("orders").doc(orderId).set({ status }, { merge: true });
+export async function getOrdersForCustomer(customerId: string) {
+  const snapshot = await adminDb()
+    .collection("orders")
+    .where("customerId", "==", customerId)
+    .get();
+
+  const orders = snapshot.docs
+    .map((doc) => normalizeOrder(mapDoc<Order>(doc.id, doc.data())))
+    .sort((a, b) => {
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bTime - aTime;
+    });
+
+  const filesByOrderId = await getFilesByOrderIds(orders.map((order) => order.id));
+
+  return orders.map((order) => ({
+    ...order,
+    files: filesByOrderId[order.id] ?? [],
+  })) as OrderWithFiles[];
+}
+
+export async function updateOrderStatus(
+  orderId: string,
+  status: OrderStatus,
+  finalAmount?: number | null,
+) {
+  await adminDb()
+    .collection("orders")
+    .doc(orderId)
+    .set(
+      {
+        status,
+        ...(finalAmount !== undefined ? { finalAmount } : {}),
+      },
+      { merge: true },
+    );
   return getOrderById(orderId);
+}
+
+export async function prepareOrderPayment(params: {
+  orderId: string;
+  razorpayOrderId: string;
+}) {
+  await adminDb().collection("orders").doc(params.orderId).set(
+    {
+      razorpayOrderId: params.razorpayOrderId,
+      paymentStatus: "unpaid",
+    },
+    { merge: true },
+  );
+
+  return getOrderById(params.orderId);
+}
+
+export async function markOrderPaid(params: {
+  orderId: string;
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+}) {
+  await adminDb().collection("orders").doc(params.orderId).set(
+    {
+      paymentStatus: "paid",
+      razorpayOrderId: params.razorpayOrderId,
+      razorpayPaymentId: params.razorpayPaymentId,
+      paidAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  return getOrderById(params.orderId);
 }
 
 export async function getOrderFileById(fileId: string) {

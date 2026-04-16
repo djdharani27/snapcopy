@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { formatCurrency } from "@/lib/utils/format";
 import type { Shop } from "@/types";
 
 export function ShopList({ shops }: { shops: Shop[] }) {
@@ -54,6 +55,16 @@ export function ShopList({ shops }: { shops: Shop[] }) {
               <div className="space-y-2 text-sm text-slate-600">
                 <p>{shop.address}</p>
                 <p>{shop.phone}</p>
+              </div>
+
+              <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
+                <p className="font-semibold text-slate-900">Starting prices</p>
+                <p className="mt-2">
+                  B/W single: {formatCurrency(shop.pricing.blackWhiteSingle)}
+                </p>
+                <p>B/W double: {formatCurrency(shop.pricing.blackWhiteDouble)}</p>
+                <p>Color single: {formatCurrency(shop.pricing.colorSingle)}</p>
+                <p>Color double: {formatCurrency(shop.pricing.colorDouble)}</p>
               </div>
 
               <Link
