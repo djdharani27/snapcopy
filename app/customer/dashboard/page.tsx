@@ -1,6 +1,7 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { CustomerOrdersList } from "@/components/customer/customer-orders-list";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { RefreshButton } from "@/components/layout/refresh-button";
 import { ShopList } from "@/components/customer/shop-list";
 import { AutoRefresh } from "@/components/shop-owner/auto-refresh";
 import {
@@ -22,6 +23,7 @@ export default async function CustomerDashboardPage() {
       profile={profile}
       title="Customer dashboard"
       description="Browse nearby Xerox shops and send printing jobs in a few steps."
+      actions={<RefreshButton />}
     >
       <div className="space-y-6">
         <AutoRefresh />

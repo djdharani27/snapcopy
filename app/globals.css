@@ -32,6 +32,16 @@ body {
   font-family: var(--font-manrope), sans-serif;
 }
 
+@keyframes beta-marquee-scroll {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -46,6 +56,27 @@ textarea {
 
 .page-shell {
   @apply min-h-screen bg-[radial-gradient(circle_at_top,_rgba(15,118,110,0.14),_transparent_28%),linear-gradient(180deg,#f8fafc_0%,#eef6f7_100%)];
+}
+
+.beta-marquee {
+  @apply overflow-hidden border-b border-teal-900/20 bg-slate-950 py-2 text-[11px] font-bold uppercase tracking-[0.28em] text-teal-100;
+}
+
+.beta-marquee__track {
+  display: flex;
+  width: max-content;
+  animation: beta-marquee-scroll 16s linear infinite;
+}
+
+.beta-marquee__group {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.beta-marquee__track span {
+  flex: 0 0 auto;
+  padding-right: 2.5rem;
+  white-space: nowrap;
 }
 
 .panel {

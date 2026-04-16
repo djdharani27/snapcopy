@@ -1,6 +1,7 @@
 import { unstable_noStore as noStore } from "next/cache";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { RefreshButton } from "@/components/layout/refresh-button";
 import { AutoRefresh } from "@/components/shop-owner/auto-refresh";
 import { OrdersTable } from "@/components/shop-owner/orders-table";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
@@ -25,9 +26,12 @@ export default async function ShopOwnerDashboardPage() {
       title={`${shop.shopName} orders`}
       description="Incoming print requests for your shop. Download files from S3 and update order status as work progresses."
       actions={
-        <Link href="/shop-owner/setup" className="btn-secondary">
-          Shop settings
-        </Link>
+        <>
+          <RefreshButton />
+          <Link href="/shop-owner/setup" className="btn-secondary">
+            Shop settings
+          </Link>
+        </>
       }
     >
       <AutoRefresh />

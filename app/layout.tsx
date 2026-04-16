@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
 import { AuthProvider } from "@/components/auth/auth-provider";
+import { BetaMarquee } from "@/components/layout/beta-marquee";
+import { LaunchBetaPopup } from "@/components/layout/launch-beta-popup";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -28,7 +30,11 @@ export default function RootLayout({
         className="min-h-full bg-slate-50 text-slate-900"
         suppressHydrationWarning
       >
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <BetaMarquee />
+          <LaunchBetaPopup />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );
