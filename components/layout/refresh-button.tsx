@@ -12,6 +12,7 @@ export function RefreshButton() {
       type="button"
       className="btn-secondary"
       disabled={isPending}
+      suppressHydrationWarning
       onClick={() => {
         startTransition(() => {
           router.refresh();

@@ -189,6 +189,7 @@ export function OrdersTable({
                         step="0.01"
                         className="input"
                         value={completionAmounts[order.id] ?? ""}
+                        suppressHydrationWarning
                         onChange={(event) =>
                           setCompletionAmounts((current) => ({
                             ...current,
@@ -199,6 +200,7 @@ export function OrdersTable({
                       <button
                         type="button"
                         disabled={updatingOrderId === order.id}
+                        suppressHydrationWarning
                         onClick={() => void handleStatusChange(order.id, "completed")}
                         className="btn-secondary mt-4 w-full"
                       >
@@ -219,6 +221,7 @@ export function OrdersTable({
                     step="0.01"
                     className="input"
                     value={completionAmounts[order.id] ?? ""}
+                    suppressHydrationWarning
                     onChange={(event) =>
                       setCompletionAmounts((current) => ({
                         ...current,
@@ -229,6 +232,7 @@ export function OrdersTable({
                   <button
                     type="button"
                     disabled={updatingOrderId === order.id}
+                    suppressHydrationWarning
                     onClick={() => void handleStatusChange(order.id, "completed")}
                     className="btn-primary mt-4 w-full"
                   >
