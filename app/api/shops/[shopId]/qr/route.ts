@@ -34,5 +34,5 @@ export async function GET(
     );
   }
 
-  return new Response(bytes, { headers });
+  return new Response(new Uint8Array(bytes), { headers });
 }
