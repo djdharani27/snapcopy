@@ -6,12 +6,17 @@ import {
   formatCurrency,
   formatDate,
   formatFileSize,
+  formatTrackingId,
   statusClassName,
   statusLabel,
 } from "@/lib/utils/format";
 import type { OrderStatus, OrderWithFiles } from "@/types";
 
-export function OrdersTable({ orders }: { orders: OrderWithFiles[] }) {
+export function OrdersTable({
+  orders,
+}: {
+  orders: OrderWithFiles[];
+}) {
   const router = useRouter();
   const [localOrders, setLocalOrders] = useState<OrderWithFiles[]>(orders);
   const [updatingOrderId, setUpdatingOrderId] = useState("");
@@ -97,6 +102,12 @@ export function OrdersTable({ orders }: { orders: OrderWithFiles[] }) {
               <p className="mt-2 text-sm text-slate-600">
                 {order.customerPhone}
               </p>
+              <p className="mt-2 text-sm text-slate-600">
+                Tracking ID:{" "}
+                <span className="font-semibold text-slate-900">
+                  {formatTrackingId(order.shopId, order.trackingCode, order.id)}
+                </span>
+              </p>
               <p className="mt-2 text-sm text-slate-500">
                 Received {formatDate(order.createdAt)}
               </p>
@@ -159,9 +170,42 @@ export function OrdersTable({ orders }: { orders: OrderWithFiles[] }) {
               {order.status === "completed" ? (
                 <>
                   <p className="label">Completed</p>
-                  <p className="text-sm text-slate-600">
-                    Customer can now see the final amount.
-                  </p>
+                  {order.paymentStatus === "paid" ? (
+                    <p className="text-sm text-slate-600">
+                      Payment is complete. The final amount is locked.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-sm text-slate-600">
+                        Customer can see this amount. You can still correct it before payment.
+                      </p>
+                      <label className="label mt-4" htmlFor={`amount-${order.id}`}>
+                        Correct final amount
+                      </label>
+                      <input
+                        id={`amount-${order.id}`}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="input"
+                        value={completionAmounts[order.id] ?? ""}
+                        onChange={(event) =>
+                          setCompletionAmounts((current) => ({
+                            ...current,
+                            [order.id]: event.target.value,
+                          }))
+                        }
+                      />
+                      <button
+                        type="button"
+                        disabled={updatingOrderId === order.id}
+                        onClick={() => void handleStatusChange(order.id, "completed")}
+                        className="btn-secondary mt-4 w-full"
+                      >
+                        {updatingOrderId === order.id ? "Saving..." : "Correct price"}
+                      </button>
+                    </>
+                  )}
                 </>
               ) : (
                 <>

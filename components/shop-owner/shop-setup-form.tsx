@@ -23,6 +23,7 @@ export function ShopSetupForm({ shop }: { shop?: Shop | null }) {
         body: JSON.stringify({
           shopName: formData.get("shopName"),
           address: formData.get("address"),
+          googleMapsUrl: formData.get("googleMapsUrl"),
           phone: formData.get("phone"),
           description: formData.get("description"),
           services: formData.get("services"),
@@ -92,6 +93,24 @@ export function ShopSetupForm({ shop }: { shop?: Shop | null }) {
             defaultValue={shop?.address || ""}
             required
           />
+        </div>
+
+        <div className="md:col-span-2">
+          <label className="label" htmlFor="googleMapsUrl">
+            Google Maps location
+          </label>
+          <input
+            id="googleMapsUrl"
+            name="googleMapsUrl"
+            className="input"
+            type="url"
+            inputMode="url"
+            defaultValue={shop?.googleMapsUrl || ""}
+            placeholder="Paste the Google Maps share link"
+          />
+          <p className="mt-2 text-xs text-slate-500">
+            Optional. If you add it, users can open your shop directly in Google Maps.
+          </p>
         </div>
 
         <div>

@@ -8,6 +8,7 @@ import {
   MAX_FILE_SIZE_BYTES,
   MAX_FILES_PER_ORDER,
 } from "@/lib/utils/constants";
+import { formatTrackingId } from "@/lib/utils/format";
 import type { Shop, UserProfile } from "@/types";
 
 export function UploadOrderForm({
@@ -19,16 +20,24 @@ export function UploadOrderForm({
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState("");
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [createdTrackingCode, setCreatedTrackingCode] = useState("");
   const [error, setError] = useState("");
   const [printType, setPrintType] = useState<"color" | "black_white">("black_white");
   const [sideType, setSideType] = useState<"single_side" | "double_side">("single_side");
   const [copies, setCopies] = useState(1);
 
+  function handleSuccessConfirm() {
+    setShowSuccessDialog(false);
+    setCreatedTrackingCode("");
+    router.push("/customer/orders?order=sent#orders");
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
-    setSuccess("");
+    setShowSuccessDialog(false);
+    setCreatedTrackingCode("");
     setError("");
 
     const form = event.currentTarget;
@@ -92,8 +101,8 @@ export function UploadOrderForm({
       setPrintType("black_white");
       setSideType("single_side");
       setCopies(1);
-      setSuccess("Documents uploaded and order created successfully.");
-      router.refresh();
+      setCreatedTrackingCode(orderResult.order?.trackingCode || orderResult.order?.id || "");
+      setShowSuccessDialog(true);
     } catch (submissionError) {
       setError(
         submissionError instanceof Error
@@ -228,13 +237,40 @@ export function UploadOrderForm({
       </div>
 
       {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
-      {success ? <p className="mt-4 text-sm text-emerald-700">{success}</p> : null}
-
       <div className="mt-6 flex justify-end">
-        <button type="submit" disabled={loading} className="btn-primary">
+        <button type="submit" disabled={loading || showSuccessDialog} className="btn-primary">
           {loading ? "Submitting..." : "Upload and place order"}
         </button>
       </div>
+
+      {showSuccessDialog ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
+            <h3 className="text-xl font-semibold text-slate-900">Order sent</h3>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Your documents were sent to {shop.shopName}. Click OK to go back to
+              your orders.
+            </p>
+            {createdTrackingCode ? (
+              <p className="mt-3 text-sm text-slate-700">
+                Tracking ID:{" "}
+                <span className="font-semibold">
+                  {formatTrackingId(shop.id, createdTrackingCode)}
+                </span>
+              </p>
+            ) : null}
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={handleSuccessConfirm}
+                className="btn-primary"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </form>
   );
 }

@@ -1,17 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { useAuth } from "@/components/auth/auth-provider";
 import { getFirebaseAuth, hasFirebaseClientEnv } from "@/lib/firebase/client";
 import { setClientSession } from "@/lib/auth/client-session";
 
 export function LoginCard() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const hasClientEnv = hasFirebaseClientEnv();
+  const nextPath =
+    searchParams.get("next") && searchParams.get("next") !== "/login"
+      ? searchParams.get("next")!
+      : "/";
+
+  useEffect(() => {
+    if (authLoading || !user) {
+      return;
+    }
+
+    router.replace(nextPath);
+  }, [authLoading, nextPath, router, user]);
 
   async function handleSignIn() {
     if (!hasClientEnv) {
@@ -27,8 +41,7 @@ export function LoginCard() {
       const credential = await signInWithPopup(getFirebaseAuth(), provider);
       const token = await credential.user.getIdToken(true);
       await setClientSession(token);
-      router.replace(searchParams.get("next") || "/");
-      router.refresh();
+      router.replace(nextPath);
     } catch (signInError) {
       setError(
         signInError instanceof Error
@@ -57,11 +70,15 @@ export function LoginCard() {
       <button
         type="button"
         onClick={handleSignIn}
-        disabled={loading || !hasClientEnv}
+        disabled={loading || authLoading || !hasClientEnv}
         className="btn-primary w-full"
       >
         {!hasClientEnv
           ? "Add Firebase config first"
+          : authLoading
+            ? "Checking session..."
+          : user
+            ? "Redirecting..."
           : loading
             ? "Signing in..."
             : "Continue with Google"}

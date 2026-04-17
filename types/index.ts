@@ -21,6 +21,7 @@ export interface Shop {
   ownerId: string;
   shopName: string;
   address: string;
+  googleMapsUrl?: string;
   phone: string;
   description: string;
   services: string[];
@@ -35,6 +36,7 @@ export interface Shop {
 
 export interface Order {
   id: string;
+  trackingCode?: string;
   customerId: string;
   shopId: string;
   customerName: string;

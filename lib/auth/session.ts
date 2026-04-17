@@ -48,7 +48,7 @@ export async function requireRole(role: UserRole) {
   }
 
   if (profile.role !== role) {
-    redirect(profile.role === "customer" ? "/customer/dashboard" : "/shop-owner/dashboard");
+    redirect(profile.role === "customer" ? "/customer/shops" : "/shop-owner/dashboard");
   }
 
   return { decoded, profile };

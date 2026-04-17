@@ -19,6 +19,24 @@ function timestampToIso(value: unknown) {
   return null;
 }
 
+function normalizeGoogleMapsUrl(value: unknown) {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) {
+    return "";
+  }
+
+  try {
+    const url = new URL(rawValue);
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return rawValue;
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
 function mapDoc<T>(id: string, data: FirebaseFirestore.DocumentData) {
   return {
     id,
@@ -31,6 +49,10 @@ function mapDoc<T>(id: string, data: FirebaseFirestore.DocumentData) {
 function normalizeShop(shop: Shop): Shop {
   return {
     ...shop,
+    googleMapsUrl: normalizeGoogleMapsUrl(
+      (shop as Shop & { location?: string }).googleMapsUrl ||
+        (shop as Shop & { location?: string }).location,
+    ),
     services: Array.isArray(shop.services) ? shop.services : [],
     pricing: {
       blackWhiteSingle: Number(shop.pricing?.blackWhiteSingle || 0),
@@ -44,6 +66,7 @@ function normalizeShop(shop: Shop): Shop {
 function normalizeOrder(order: Order): Order {
   return {
     ...order,
+    trackingCode: String(order.trackingCode || ""),
     finalAmount:
       order.finalAmount === null || order.finalAmount === undefined
         ? null
@@ -117,6 +140,7 @@ export async function createShop(params: {
   ownerId: string;
   shopName: string;
   address: string;
+  googleMapsUrl?: string;
   phone: string;
   description: string;
   services: string[];
@@ -133,6 +157,7 @@ export async function createShop(params: {
     ownerId: params.ownerId,
     shopName: params.shopName,
     address: params.address,
+    googleMapsUrl: params.googleMapsUrl || "",
     phone: params.phone,
     description: params.description,
     services: params.services,
@@ -148,6 +173,7 @@ export async function updateShop(params: {
   ownerId: string;
   shopName: string;
   address: string;
+  googleMapsUrl?: string;
   phone: string;
   description: string;
   services: string[];
@@ -162,6 +188,7 @@ export async function updateShop(params: {
     {
       shopName: params.shopName,
       address: params.address,
+      googleMapsUrl: params.googleMapsUrl || "",
       phone: params.phone,
       description: params.description,
       services: params.services,
@@ -187,9 +214,26 @@ export async function createOrderWithFiles(params: {
   const db = adminDb();
   const orderRef = db.collection("orders").doc();
   const batch = db.batch();
+  const createdAt = Timestamp.now();
+  const istOffsetMs = 5.5 * 60 * 60 * 1000;
+  const istDate = new Date(createdAt.toDate().getTime() + istOffsetMs);
+  const day = String(istDate.getUTCDate()).padStart(2, "0");
+  const month = String(istDate.getUTCMonth() + 1).padStart(2, "0");
+  const year = String(istDate.getUTCFullYear());
+  const datePrefix = `${day}${month}${year}_`;
+  const sameShopOrdersSnapshot = await db
+    .collection("orders")
+    .where("shopId", "==", params.shopId)
+    .get();
+  const todaysOrderCount = sameShopOrdersSnapshot.docs.filter((doc) =>
+    String(doc.data().trackingCode || "").startsWith(datePrefix),
+  ).length;
+  const nthOrder = String(todaysOrderCount + 1).padStart(3, "0");
+  const trackingCode = `${day}${month}${year}_${nthOrder}`;
 
   batch.set(orderRef, {
     id: orderRef.id,
+    trackingCode,
     customerId: params.customerId,
     shopId: params.shopId,
     customerName: params.customerName,
@@ -204,7 +248,7 @@ export async function createOrderWithFiles(params: {
     razorpayPaymentId: null,
     paidAt: null,
     status: "pending",
-    createdAt: FieldValue.serverTimestamp(),
+    createdAt,
   });
 
   params.files.forEach((file) => {

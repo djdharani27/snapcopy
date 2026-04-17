@@ -14,7 +14,7 @@ export default async function ShopOwnerSetupPage() {
     <DashboardShell
       profile={profile}
       title={existingShop ? "Shop settings" : "Set up your shop"}
-      description="Create or manage the single shop profile used by this MVP. Customers will see your services and price list before placing orders."
+      description="Create or manage the single shop profile used by this MVP. Customers will see your Google Maps location, services, and price list before placing orders."
     >
       <ShopSetupForm shop={existingShop} />
     </DashboardShell>

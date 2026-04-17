@@ -9,7 +9,7 @@ export default async function SelectRolePage() {
   if (profile) {
     redirect(
       profile.role === "customer"
-        ? "/customer/dashboard"
+        ? "/customer/shops"
         : "/shop-owner/dashboard",
     );
   }

@@ -1,7 +1,9 @@
 import { unstable_noStore as noStore } from "next/cache";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CustomerNav } from "@/components/customer/customer-nav";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { RefreshButton } from "@/components/layout/refresh-button";
 import { UploadOrderForm } from "@/components/customer/upload-order-form";
 import { requireRole } from "@/lib/auth/session";
 import { getShopById } from "@/lib/firebase/firestore-admin";
@@ -25,14 +27,37 @@ export default async function CustomerShopPage({
     <DashboardShell
       profile={profile}
       title={shop.shopName}
-      description={`${shop.address} | ${shop.phone}`}
+      description={shop.address}
       actions={
-        <Link href="/customer/dashboard" className="btn-secondary">
-          Back to shops
-        </Link>
+        <>
+          <CustomerNav active="shops" />
+          <RefreshButton />
+          <Link href="/customer/shops" className="btn-secondary">
+            Back to shops
+          </Link>
+        </>
       }
     >
       <div className="mb-5 grid gap-5 md:grid-cols-2">
+        <div className="panel p-5">
+          <p className="text-sm text-slate-500">Location</p>
+          <p className="mt-3 text-sm leading-6 text-slate-900">{shop.address}</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <a href={`tel:${shop.phone}`} className="btn-secondary">
+              Call
+            </a>
+            {shop.googleMapsUrl ? (
+              <a
+                href={shop.googleMapsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-secondary"
+              >
+                Location
+              </a>
+            ) : null}
+          </div>
+        </div>
         <div className="panel p-5">
           <p className="text-sm text-slate-500">Services</p>
           <div className="mt-3 flex flex-wrap gap-2">

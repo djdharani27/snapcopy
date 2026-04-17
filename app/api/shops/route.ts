@@ -22,6 +22,31 @@ function parsePrice(value: unknown) {
   return numericValue;
 }
 
+function parseGoogleMapsUrl(value: unknown) {
+  const trimmedValue = String(value || "").trim();
+  if (!trimmedValue) {
+    return "";
+  }
+
+  let url: URL;
+  try {
+    url = new URL(trimmedValue);
+  } catch {
+    throw new Error("Enter a valid Google Maps link.");
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("Enter a valid Google Maps link.");
+  }
+
+  const hostname = url.hostname.toLowerCase();
+  if (!hostname.includes("google.") && !hostname.includes("maps.app.goo.gl")) {
+    throw new Error("Use a Google Maps share link.");
+  }
+
+  return trimmedValue;
+}
+
 export async function GET() {
   try {
     await requireApiRole("customer");
@@ -41,6 +66,7 @@ export async function POST(request: Request) {
     const {
       shopName,
       address,
+      googleMapsUrl,
       phone,
       description,
       services,
@@ -65,6 +91,7 @@ export async function POST(request: Request) {
       ownerId: decoded.uid,
       shopName: String(shopName).trim(),
       address: String(address).trim(),
+      googleMapsUrl: parseGoogleMapsUrl(googleMapsUrl),
       phone: String(phone).trim(),
       description: String(description || "").trim(),
       services: parseServices(services),
@@ -92,6 +119,7 @@ export async function PATCH(request: Request) {
     const {
       shopName,
       address,
+      googleMapsUrl,
       phone,
       description,
       services,
@@ -103,6 +131,7 @@ export async function PATCH(request: Request) {
       ownerId: decoded.uid,
       shopName: String(shopName || "").trim(),
       address: String(address || "").trim(),
+      googleMapsUrl: parseGoogleMapsUrl(googleMapsUrl),
       phone: String(phone || "").trim(),
       description: String(description || "").trim(),
       services: parseServices(services),

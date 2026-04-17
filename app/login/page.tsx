@@ -7,7 +7,7 @@ export default async function LoginPage() {
   const profile = await getCurrentUserProfile();
 
   if (token && profile) {
-    redirect(profile.role === "customer" ? "/customer/dashboard" : "/shop-owner/dashboard");
+    redirect(profile.role === "customer" ? "/customer/shops" : "/shop-owner/dashboard");
   }
 
   if (token && !profile) {

@@ -11,7 +11,7 @@ export default async function HomePage() {
   }
 
   if (profile.role === "customer") {
-    redirect("/customer/dashboard");
+    redirect("/customer/shops");
   }
 
   const shop = await getShopByOwnerId(decoded.uid);

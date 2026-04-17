@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { PayOrderButton } from "@/components/customer/pay-order-button";
-import { customerStatusLabel, formatCurrency, formatDate, statusClassName } from "@/lib/utils/format";
+import {
+  customerStatusLabel,
+  formatCurrency,
+  formatDate,
+  formatTrackingId,
+  statusClassName,
+} from "@/lib/utils/format";
 import type { OrderWithFiles, Shop, UserProfile } from "@/types";
 
 export function CustomerOrdersList({
@@ -41,6 +47,29 @@ export function CustomerOrdersList({
                   Sent {formatDate(order.createdAt)}
                 </p>
                 <p className="mt-2 text-sm text-slate-600">
+                  Tracking ID:{" "}
+                  <span className="font-semibold text-slate-900">
+                    {formatTrackingId(order.shopId, order.trackingCode, order.id)}
+                  </span>
+                </p>
+                {shop ? (
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    <a href={`tel:${shop.phone}`} className="btn-secondary">
+                      Call
+                    </a>
+                    {shop.googleMapsUrl ? (
+                      <a
+                        href={shop.googleMapsUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn-secondary"
+                      >
+                        Location
+                      </a>
+                    ) : null}
+                  </div>
+                ) : null}
+                <p className="mt-3 text-sm text-slate-600">
                   {order.printType === "color" ? "Color" : "Black & white"} |{" "}
                   {order.sideType === "double_side" ? "Double side" : "Single side"} |{" "}
                   {order.copies} copies

@@ -46,7 +46,7 @@ export function RoleSelectionForm() {
 
       router.replace(
         selectedRole === "customer"
-          ? "/customer/dashboard"
+          ? "/customer/shops"
           : "/shop-owner/setup",
       );
     } catch (submissionError) {
