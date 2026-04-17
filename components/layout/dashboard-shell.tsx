@@ -31,12 +31,12 @@ export function DashboardShell({
             </p>
           </div>
 
-          <div className="flex flex-col items-start gap-3 md:items-end">
+          <div className="flex w-full flex-col items-start gap-3 md:w-auto md:items-end">
             <div className="text-sm text-slate-600">
               <p className="font-semibold text-slate-900">{profile.name}</p>
               <p>{profile.email}</p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap md:w-auto md:justify-end">
               {actions}
               <LogoutButton />
             </div>
