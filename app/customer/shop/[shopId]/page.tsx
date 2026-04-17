@@ -7,6 +7,7 @@ import { RefreshButton } from "@/components/layout/refresh-button";
 import { UploadOrderForm } from "@/components/customer/upload-order-form";
 import { requireRole } from "@/lib/auth/session";
 import { getShopById } from "@/lib/firebase/firestore-admin";
+import { formatCurrency } from "@/lib/utils/format";
 
 export default async function CustomerShopPage({
   params,
@@ -75,16 +76,21 @@ export default async function CustomerShopPage({
             )}
           </div>
         </div>
-        <div className="panel p-5 text-sm text-slate-700">
-          <p className="text-sm text-slate-500">Price list</p>
-          <p className="mt-3">B/W single: Rs. {shop.pricing.blackWhiteSingle}</p>
-          <p>B/W double: Rs. {shop.pricing.blackWhiteDouble}</p>
-          <p>Color single: Rs. {shop.pricing.colorSingle}</p>
-          <p>Color double: Rs. {shop.pricing.colorDouble}</p>
-        </div>
       </div>
 
       <UploadOrderForm shop={shop} profile={profile} />
+
+      <div className="mt-5">
+        <div className="panel p-5 text-sm text-slate-700">
+          <p className="text-sm text-slate-500">Price list</p>
+          <p className="mt-3">
+            B/W single: {formatCurrency(shop.pricing.blackWhiteSingle)}
+          </p>
+          <p>B/W double: {formatCurrency(shop.pricing.blackWhiteDouble)}</p>
+          <p>Color single: {formatCurrency(shop.pricing.colorSingle)}</p>
+          <p>Color double: {formatCurrency(shop.pricing.colorDouble)}</p>
+        </div>
+      </div>
     </DashboardShell>
   );
 }
