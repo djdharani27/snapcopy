@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { RefreshButton } from "@/components/layout/refresh-button";
 import { AutoRefresh } from "@/components/shop-owner/auto-refresh";
 import { OrdersTable } from "@/components/shop-owner/orders-table";
+import { ShopQrCard } from "@/components/shop-owner/shop-qr-card";
 import { ShopOwnerNav } from "@/components/shop-owner/shop-owner-nav";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { requireRole } from "@/lib/auth/session";
@@ -69,6 +70,10 @@ export default async function ShopOwnerDashboardPage() {
           <p className="text-sm text-slate-500">Phone</p>
           <p className="mt-2 text-lg font-semibold text-slate-900">{shop.phone}</p>
         </div>
+      </div>
+
+      <div className="mb-5">
+        <ShopQrCard shopId={shop.id} />
       </div>
 
       <OrdersTable orders={orders} />

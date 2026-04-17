@@ -21,7 +21,7 @@ const roleCards: {
   },
 ];
 
-export function RoleSelectionForm() {
+export function RoleSelectionForm({ nextPath = "" }: { nextPath?: string }) {
   const router = useRouter();
   const [selectedRole, setSelectedRole] = useState<UserRole>("customer");
   const [loading, setLoading] = useState(false);
@@ -46,7 +46,7 @@ export function RoleSelectionForm() {
 
       router.replace(
         selectedRole === "customer"
-          ? "/customer/shops"
+          ? nextPath || "/customer/shops"
           : "/shop-owner/setup",
       );
     } catch (submissionError) {
