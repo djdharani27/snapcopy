@@ -1,5 +1,6 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { CustomerNav } from "@/components/customer/customer-nav";
+import { ShopQrScanButton } from "@/components/customer/shop-qr-scan-button";
 import { ShopList } from "@/components/customer/shop-list";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { RefreshButton } from "@/components/layout/refresh-button";
@@ -26,10 +27,15 @@ export default async function CustomerShopsPage() {
     >
       <section>
         <div className="mb-4">
-          <h2 className="text-xl font-semibold text-slate-900">Available shops</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Compare nearby Xerox shops before uploading your documents.
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900">Available shops</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Compare nearby Xerox shops before uploading your documents.
+              </p>
+            </div>
+            <ShopQrScanButton />
+          </div>
         </div>
         <ShopList shops={shops} showPricing={false} />
       </section>

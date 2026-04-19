@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { CopyShopLinkButton } from "@/components/shop-owner/copy-shop-link-button";
 import { buildShopShareUrl } from "@/lib/utils/url";
 
 interface ShopQrCardProps {
@@ -29,9 +30,7 @@ export function ShopQrCard({ shopId }: ShopQrCardProps) {
       </div>
       <p className="mt-4 break-all text-xs text-slate-500">{sharePath}</p>
       <div className="mt-4 flex flex-wrap gap-3">
-        <a href={sharePath} className="btn-secondary">
-          Open link
-        </a>
+        <CopyShopLinkButton url={sharePath} />
         <a href={downloadUrl} className="btn-primary">
           Download QR
         </a>
