@@ -35,11 +35,11 @@ export function LaunchBetaPopup() {
           Beta Testing
         </p>
         <h2 className="mt-3 text-2xl font-bold text-slate-900">
-          Launch date: April 20, 2026
+          Launch date: April 22, 2026
         </h2>
         <p className="mt-3 text-sm leading-6 text-slate-600">
           <span className="font-bold text-slate-900">
-            Testing will be till April 20, 2026.
+            Testing will be till April 22, 2026.
           </span>{" "}
           You can use this build to test the experience with your college peers
           before the public launch.
