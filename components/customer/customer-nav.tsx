@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ShopQrScanButton } from "@/components/customer/shop-qr-scan-button";
 
 export function CustomerNav({
   active,
@@ -6,19 +7,25 @@ export function CustomerNav({
   active: "shops" | "orders";
 }) {
   return (
-    <div className="flex w-full gap-2 sm:w-auto">
+    <nav
+      aria-label="Customer sections"
+      className="flex min-w-max items-center gap-1.5"
+    >
+      <ShopQrScanButton variant="icon" />
       <Link
         href="/customer/shops"
-        className={`${active === "shops" ? "btn-primary" : "btn-secondary"} flex-1 sm:flex-none`}
+        aria-current={active === "shops" ? "page" : undefined}
+        className={active === "shops" ? "nav-pill-active" : "nav-pill"}
       >
         Shops
       </Link>
       <Link
         href="/customer/orders"
-        className={`${active === "orders" ? "btn-primary" : "btn-secondary"} flex-1 sm:flex-none`}
+        aria-current={active === "orders" ? "page" : undefined}
+        className={active === "orders" ? "nav-pill-active" : "nav-pill"}
       >
         Orders
       </Link>
-    </div>
+    </nav>
   );
 }

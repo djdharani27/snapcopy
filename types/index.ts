@@ -105,6 +105,8 @@ export interface OrderFile {
   s3Url: string;
   mimeType: string;
   size: number;
+  downloadedAt?: string | null;
+  downloadedByOwnerId?: string | null;
   createdAt?: string | null;
 }
 

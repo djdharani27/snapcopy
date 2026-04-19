@@ -74,17 +74,45 @@ export async function uploadBufferToS3(params: {
   };
 }
 
-export async function getDownloadUrl(key: string) {
+export async function getDownloadUrl(params: {
+  key: string;
+  fileName?: string;
+  contentType?: string;
+  disposition?: "attachment" | "inline";
+}) {
   const client = getS3Client();
+  const safeFileName = (params.fileName || "file")
+    .replace(/[\r\n"]/g, "")
+    .trim();
+  const dispositionType = params.disposition ?? "attachment";
+  const responseContentDisposition = `${dispositionType}; filename="${safeFileName}"`;
 
   return getSignedUrl(
     client,
     new GetObjectCommand({
       Bucket: getBucketName(),
-      Key: key,
+      Key: params.key,
+      ResponseContentDisposition: responseContentDisposition,
+      ...(params.contentType ? { ResponseContentType: params.contentType } : {}),
     }),
     { expiresIn: 60 * 10 },
   );
+}
+
+export async function getObjectBytes(key: string) {
+  const client = getS3Client();
+  const response = await client.send(
+    new GetObjectCommand({
+      Bucket: getBucketName(),
+      Key: key,
+    }),
+  );
+
+  if (!response.Body) {
+    throw new Error("File body is empty.");
+  }
+
+  return response.Body.transformToByteArray();
 }
 
 export async function deleteS3Objects(keys: string[]) {

@@ -1,17 +1,14 @@
 import { NextResponse } from "next/server";
 import { requireApiAdmin } from "@/lib/auth/admin";
-import { deleteS3Objects, listAllS3Keys } from "@/lib/aws/s3";
+import { deleteS3Objects } from "@/lib/aws/s3";
 import { deleteAllOrderFileRecords } from "@/lib/firebase/firestore-admin";
 
 export async function DELETE() {
   try {
     await requireApiAdmin();
-    const [bucketKeys, fileRecords] = await Promise.all([
-      listAllS3Keys(),
-      deleteAllOrderFileRecords(),
-    ]);
+    const fileRecords = await deleteAllOrderFileRecords();
 
-    const deletedS3ObjectCount = await deleteS3Objects(bucketKeys);
+    const deletedS3ObjectCount = await deleteS3Objects(fileRecords.s3Keys);
 
     return NextResponse.json({
       success: true,

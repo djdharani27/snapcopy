@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireApiRole } from "@/lib/auth/session";
-import { getObjectBytes } from "@/lib/aws/s3";
+import { getDownloadUrl } from "@/lib/aws/s3";
 import {
   getOrderById,
   getOrderFileById,
   getShopByOwnerId,
-  markOrderFileDownloaded,
 } from "@/lib/firebase/firestore-admin";
 
 export async function GET(
@@ -28,24 +27,24 @@ export async function GET(
       return NextResponse.json({ error: "File not found." }, { status: 404 });
     }
 
-    const bytes = await getObjectBytes(file.s3Key);
+    if (!file.downloadedAt) {
+      return NextResponse.json(
+        { error: "Download the file before opening it." },
+        { status: 400 },
+      );
+    }
 
-    await markOrderFileDownloaded({
-      fileId: file.id,
-      ownerId: decoded.uid,
+    const url = await getDownloadUrl({
+      key: file.s3Key,
+      fileName: file.originalFileName,
+      contentType: file.mimeType,
+      disposition: "inline",
     });
 
-    const safeFileName = file.originalFileName.replace(/[\r\n"]/g, "").trim() || "file";
-    const headers = new Headers();
-    headers.set("Content-Type", file.mimeType || "application/octet-stream");
-    headers.set("Content-Length", String(bytes.byteLength));
-    headers.set("Cache-Control", "no-store");
-    headers.set("Content-Disposition", `attachment; filename="${safeFileName}"`);
-
-    return new Response(bytes, { headers });
+    return NextResponse.redirect(new URL(url));
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to download file." },
+      { error: error instanceof Error ? error.message : "Unable to open file." },
       { status: 400 },
     );
   }

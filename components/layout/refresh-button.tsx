@@ -10,8 +10,10 @@ export function RefreshButton() {
   return (
     <button
       type="button"
-      className="btn-secondary"
+      className="icon-btn"
       disabled={isPending}
+      aria-label={isPending ? "Refreshing" : "Refresh"}
+      title={isPending ? "Refreshing" : "Refresh"}
       suppressHydrationWarning
       onClick={() => {
         startTransition(() => {
@@ -19,7 +21,19 @@ export function RefreshButton() {
         });
       }}
     >
-      {isPending ? "Refreshing..." : "Refresh"}
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        className={`h-5 w-5 ${isPending ? "animate-spin" : ""}`}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+        <path d="M21 3v6h-6" />
+      </svg>
     </button>
   );
 }

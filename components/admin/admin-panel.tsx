@@ -196,7 +196,7 @@ export function AdminPanel({
 
   async function handleClearStorage() {
     const confirmed = window.confirm(
-      "Delete every uploaded file in S3 and remove all file records? This cannot be undone.",
+      "Delete only files that have already been downloaded by a shop owner? This cannot be undone.",
     );
 
     if (!confirmed) {
@@ -468,11 +468,11 @@ export function AdminPanel({
           <div>
             <p className="text-sm text-slate-500">Storage maintenance</p>
             <h2 className="mt-2 text-xl font-semibold text-slate-900">
-              Delete all uploaded files
+              Delete downloaded files
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-              This clears the S3 bucket and removes all `order_files` records. Orders stay in
-              Firestore, but their attachments are permanently removed.
+              Only files already marked as downloaded by a shop owner can be deleted here. Orders
+              stay in Firestore, but those downloaded attachments are permanently removed.
             </p>
           </div>
           <button
@@ -481,7 +481,7 @@ export function AdminPanel({
             disabled={cleanupLoading}
             className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {cleanupLoading ? "Deleting files..." : "Delete all files"}
+            {cleanupLoading ? "Deleting files..." : "Delete downloaded files"}
           </button>
         </div>
         {storageMessage ? <p className="mt-4 text-sm text-teal-700">{storageMessage}</p> : null}

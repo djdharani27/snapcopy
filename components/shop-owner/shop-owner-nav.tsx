@@ -6,19 +6,24 @@ export function ShopOwnerNav({
   active: "orders" | "revenue";
 }) {
   return (
-    <div className="flex w-full gap-2 sm:w-auto">
+    <nav
+      aria-label="Shop owner sections"
+      className="flex min-w-max items-center gap-1.5"
+    >
       <Link
         href="/shop-owner/dashboard"
-        className={`${active === "orders" ? "btn-primary" : "btn-secondary"} flex-1 sm:flex-none`}
+        aria-current={active === "orders" ? "page" : undefined}
+        className={active === "orders" ? "nav-pill-active" : "nav-pill"}
       >
         Orders
       </Link>
       <Link
         href="/shop-owner/revenue"
-        className={`${active === "revenue" ? "btn-primary" : "btn-secondary"} flex-1 sm:flex-none`}
+        aria-current={active === "revenue" ? "page" : undefined}
+        className={active === "revenue" ? "nav-pill-active" : "nav-pill"}
       >
         Revenue
       </Link>
-    </div>
+    </nav>
   );
 }

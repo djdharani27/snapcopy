@@ -24,7 +24,12 @@ export function CopyShopLinkButton({ url }: { url: string }) {
   }
 
   return (
-    <button type="button" onClick={handleCopy} className="btn-secondary">
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="btn-secondary"
+      suppressHydrationWarning
+    >
       {copied ? "Copied link" : "Copy link"}
     </button>
   );

@@ -61,15 +61,14 @@ export function RoleSelectionForm({ nextPath = "" }: { nextPath?: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="panel w-full max-w-2xl p-8">
+    <form onSubmit={handleSubmit} className="panel-strong w-full max-w-2xl p-8">
       <div className="mb-6">
-        <p className="mb-2 text-sm font-semibold uppercase tracking-[0.25em] text-teal-700">
-          One-time setup
-        </p>
-        <h1 className="text-3xl font-bold text-slate-900">Choose your role</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-600">
-          This MVP supports two roles only. Customers place orders. Shop owners
-          receive and download documents.
+        <p className="eyebrow">One-time setup</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-900">
+          Choose your role
+        </h1>
+        <p className="mt-3 text-sm leading-7 text-slate-600">
+          Customers place orders. Shop owners receive files, price them, and manage payouts.
         </p>
       </div>
 
@@ -81,10 +80,10 @@ export function RoleSelectionForm({ nextPath = "" }: { nextPath?: string }) {
               key={card.role}
               type="button"
               onClick={() => setSelectedRole(card.role)}
-              className={`rounded-2xl border p-5 text-left transition ${
+              className={`rounded-[26px] border p-5 text-left transition ${
                 active
-                  ? "border-teal-700 bg-teal-50 shadow-sm"
-                  : "border-slate-200 bg-white hover:border-slate-300"
+                  ? "border-[#c96d38] bg-[rgba(255,241,228,0.92)] shadow-[0_18px_36px_rgba(156,76,32,0.12)]"
+                  : "border-[#eadfd3] bg-[rgba(255,252,247,0.8)] hover:border-[#d9c6b5]"
               }`}
             >
               <div className="mb-3 flex items-center justify-between">
@@ -94,7 +93,7 @@ export function RoleSelectionForm({ nextPath = "" }: { nextPath?: string }) {
                 <span
                   className={`h-4 w-4 rounded-full border ${
                     active
-                      ? "border-teal-700 bg-teal-700"
+                      ? "border-[#c96d38] bg-[#c96d38]"
                       : "border-slate-300 bg-white"
                   }`}
                 />

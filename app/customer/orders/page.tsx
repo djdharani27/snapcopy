@@ -28,12 +28,9 @@ export default async function CustomerOrdersPage({
       profile={profile}
       title="Your orders"
       description="Track print requests, final amounts, and payment status."
-      actions={
-        <>
-          <CustomerNav active="orders" />
-          <RefreshButton />
-        </>
-      }
+      hideIntro
+      navigation={<CustomerNav active="orders" />}
+      actions={<RefreshButton />}
     >
       <div className="space-y-6">
         <AutoRefresh customerId={decoded.uid} />

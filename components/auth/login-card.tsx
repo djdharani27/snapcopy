@@ -53,17 +53,14 @@ export function LoginCard() {
   }
 
   return (
-    <div className="panel w-full max-w-md p-8">
+    <div className="panel-strong w-full max-w-md p-8">
       <div className="mb-8">
-        <p className="mb-2 text-sm font-semibold uppercase tracking-[0.25em] text-teal-700">
-          SnapCopy
-        </p>
-        <h1 className="text-3xl font-bold text-slate-900">
+        <p className="eyebrow">SnapCopy</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-900">
           Sign in to send print orders
         </h1>
-        <p className="mt-3 text-sm leading-6 text-slate-600">
-          Google sign-in is enough for this MVP. Your role and shop access are
-          set after login.
+        <p className="mt-3 text-sm leading-7 text-slate-600">
+          Google sign-in is enough for this MVP. Your role and shop access are set after login.
         </p>
       </div>
 
@@ -85,7 +82,7 @@ export function LoginCard() {
       </button>
 
       {!hasClientEnv ? (
-        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <div className="mt-4 rounded-[24px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           Missing Firebase client config. Create `.env.local` in the project root
           and copy the values from your Firebase project settings.
         </div>

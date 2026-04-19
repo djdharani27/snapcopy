@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   formatCurrency,
@@ -12,14 +12,67 @@ import {
 } from "@/lib/utils/format";
 import type { OrderStatus, OrderWithFiles } from "@/types";
 
+const DOWNLOADED_FILES_DB = "snapcopy-downloaded-files";
+const DOWNLOADED_FILES_STORE = "files";
+
+function openDownloadedFilesDb() {
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const request = window.indexedDB.open(DOWNLOADED_FILES_DB, 1);
+
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(DOWNLOADED_FILES_STORE)) {
+        database.createObjectStore(DOWNLOADED_FILES_STORE);
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error("Unable to open local file store."));
+  });
+}
+
+async function saveDownloadedFile(fileId: string, blob: Blob) {
+  const database = await openDownloadedFilesDb();
+
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(DOWNLOADED_FILES_STORE, "readwrite");
+    const store = transaction.objectStore(DOWNLOADED_FILES_STORE);
+    const request = store.put(blob, fileId);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error ?? new Error("Unable to save downloaded file."));
+  });
+
+  database.close();
+}
+
+async function getDownloadedFile(fileId: string) {
+  const database = await openDownloadedFilesDb();
+
+  const blob = await new Promise<Blob | null>((resolve, reject) => {
+    const transaction = database.transaction(DOWNLOADED_FILES_STORE, "readonly");
+    const store = transaction.objectStore(DOWNLOADED_FILES_STORE);
+    const request = store.get(fileId);
+
+    request.onsuccess = () => resolve((request.result as Blob | undefined) ?? null);
+    request.onerror = () => reject(request.error ?? new Error("Unable to read downloaded file."));
+  });
+
+  database.close();
+  return blob;
+}
+
 export function OrdersTable({
   orders,
 }: {
   orders: OrderWithFiles[];
 }) {
   const router = useRouter();
+  const fileObjectUrlsRef = useRef<Record<string, string>>({});
   const [localOrders, setLocalOrders] = useState<OrderWithFiles[]>(orders);
   const [updatingOrderId, setUpdatingOrderId] = useState("");
+  const [downloadingFileId, setDownloadingFileId] = useState("");
+  const [downloadedFileUrls, setDownloadedFileUrls] = useState<Record<string, string>>({});
   const [completionAmounts, setCompletionAmounts] = useState<Record<string, string>>(
     () =>
       Object.fromEntries(
@@ -38,6 +91,16 @@ export function OrdersTable({
       ),
     );
   }, [orders]);
+
+  useEffect(() => {
+    const objectUrls = fileObjectUrlsRef.current;
+
+    return () => {
+      Object.values(objectUrls).forEach((url) => {
+        URL.revokeObjectURL(url);
+      });
+    };
+  }, []);
 
   async function handleStatusChange(orderId: string, status: OrderStatus) {
     setUpdatingOrderId(orderId);
@@ -77,6 +140,109 @@ export function OrdersTable({
     }
   }
 
+  function handleFileDownloaded(orderId: string, fileId: string) {
+    const downloadedAt = new Date().toISOString();
+
+    setLocalOrders((current) =>
+      current.map((order) =>
+        order.id !== orderId
+          ? order
+          : {
+              ...order,
+              files: order.files.map((file) =>
+                file.id !== fileId
+                  ? file
+                  : {
+                      ...file,
+                      downloadedAt,
+                    },
+              ),
+            },
+      ),
+    );
+  }
+
+  async function handleFileDownload(
+    orderId: string,
+    fileId: string,
+    fileName: string,
+  ) {
+    setDownloadingFileId(fileId);
+
+    try {
+      const response = await fetch(`/api/orders/files/${fileId}/download`, {
+        method: "GET",
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error || "Unable to download file.");
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const previousUrl = fileObjectUrlsRef.current[fileId];
+
+      if (previousUrl) {
+        URL.revokeObjectURL(previousUrl);
+      }
+
+      fileObjectUrlsRef.current[fileId] = objectUrl;
+      setDownloadedFileUrls((current) => ({
+        ...current,
+        [fileId]: objectUrl,
+      }));
+      await saveDownloadedFile(fileId, blob);
+      handleFileDownloaded(orderId, fileId);
+
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Unable to download file.");
+    } finally {
+      setDownloadingFileId("");
+    }
+  }
+
+  async function handleOpenDownloadedFile(fileId: string) {
+    const objectUrl = downloadedFileUrls[fileId];
+
+    if (objectUrl) {
+      window.open(objectUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    try {
+      const blob = await getDownloadedFile(fileId);
+      if (!blob) {
+        window.alert("This file is not available locally. Download it again on this device.");
+        return;
+      }
+
+      const localObjectUrl = URL.createObjectURL(blob);
+      const previousUrl = fileObjectUrlsRef.current[fileId];
+
+      if (previousUrl) {
+        URL.revokeObjectURL(previousUrl);
+      }
+
+      fileObjectUrlsRef.current[fileId] = localObjectUrl;
+      setDownloadedFileUrls((current) => ({
+        ...current,
+        [fileId]: localObjectUrl,
+      }));
+
+      window.open(localObjectUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Unable to open downloaded file.");
+    }
+  }
+
   if (localOrders.length === 0) {
     return (
       <div className="panel p-8 text-center text-sm text-slate-600">
@@ -89,10 +255,11 @@ export function OrdersTable({
     <div className="space-y-4">
       {localOrders.map((order) => (
         <article key={order.id} className="panel overflow-hidden">
-          <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 md:flex-row md:items-start md:justify-between">
+          <div className="flex flex-col gap-4 border-b border-[#eadfd3] px-5 py-5 md:flex-row md:items-start md:justify-between">
             <div>
-              <div className="flex items-center gap-3">
-                <h2 className="text-lg font-semibold text-slate-900">
+              <p className="eyebrow">Incoming order</p>
+              <div className="mt-2 flex items-center gap-3">
+                <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-900">
                   {order.customerName}
                 </h2>
                 <span className={`badge ${statusClassName(order.status)}`}>
@@ -157,7 +324,7 @@ export function OrdersTable({
               ) : null}
             </div>
 
-            <div className="grid gap-3 text-sm text-slate-600 md:text-right">
+            <div className="grid gap-3 rounded-[24px] bg-[rgba(255,247,239,0.95)] p-4 text-sm text-slate-600 md:text-right">
               <p>Print: {order.printType === "color" ? "Color" : "Black & white"}</p>
               <p>
                 Sides:{" "}
@@ -180,27 +347,53 @@ export function OrdersTable({
                   {order.files.map((file) => (
                     <div
                       key={file.id}
-                      className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center md:justify-between"
+                      className="flex flex-col gap-3 rounded-[22px] border border-[#eadfd3] bg-[rgba(255,248,241,0.82)] p-4 md:flex-row md:items-center md:justify-between"
                     >
                       <div className="text-sm text-slate-600">
-                        <p className="font-medium text-slate-900">
-                          {file.originalFileName}
-                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium text-slate-900">
+                            {file.originalFileName}
+                          </p>
+                          {file.downloadedAt ? (
+                            <span className="badge status-downloaded">Downloaded</span>
+                          ) : null}
+                        </div>
                         <p>{formatFileSize(file.size)}</p>
                       </div>
-                      <a
-                        href={`/api/orders/files/${file.id}/download`}
-                        className="btn-secondary"
-                      >
-                        Download
-                      </a>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={downloadingFileId === file.id}
+                          suppressHydrationWarning
+                          onClick={() =>
+                            void handleFileDownload(
+                              order.id,
+                              file.id,
+                              file.originalFileName,
+                            )
+                          }
+                          className="btn-secondary"
+                        >
+                          {downloadingFileId === file.id ? "Downloading..." : "Download"}
+                        </button>
+                        {file.downloadedAt ? (
+                          <button
+                            type="button"
+                            suppressHydrationWarning
+                            onClick={() => void handleOpenDownloadedFile(file.id)}
+                            className="btn-secondary"
+                          >
+                            Open
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="rounded-[28px] border border-[#eadfd3] bg-[rgba(255,248,241,0.88)] p-4">
               {order.status === "completed" ? (
                 <>
                   <p className="label">Completed</p>

@@ -28,10 +28,10 @@ export default async function CustomerShopPage({
     <DashboardShell
       profile={profile}
       title={shop.shopName}
-      description={shop.address}
+      description={shop.description || shop.address}
+      navigation={<CustomerNav active="shops" />}
       actions={
         <>
-          <CustomerNav active="shops" />
           <RefreshButton />
           <Link href="/customer/shops" className="btn-secondary">
             Back to shops
@@ -39,10 +39,12 @@ export default async function CustomerShopPage({
         </>
       }
     >
-      <div className="mb-5 grid gap-5 md:grid-cols-2">
-        <div className="panel p-5">
-          <p className="text-sm text-slate-500">Location</p>
-          <p className="mt-3 text-sm leading-6 text-slate-900">{shop.address}</p>
+      <div className="mb-5 grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="panel-dark p-6">
+          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[#ffc89b]">
+            Shop details
+          </p>
+          <p className="mt-4 text-sm leading-7 text-[#f0ded0]">{shop.address}</p>
           <div className="mt-4 flex flex-wrap gap-3">
             <a href={`tel:${shop.phone}`} className="btn-secondary">
               Call
@@ -60,13 +62,13 @@ export default async function CustomerShopPage({
           </div>
         </div>
         <div className="panel p-5">
-          <p className="text-sm text-slate-500">Services</p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <p className="eyebrow">Services</p>
+          <div className="mt-4 flex flex-wrap gap-2">
             {shop.services?.length ? (
               shop.services.map((service) => (
                 <span
                   key={service}
-                  className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
+                  className="rounded-full bg-[#f5e5d7] px-3 py-1 text-xs font-semibold text-[#6a4d3a]"
                 >
                   {service}
                 </span>
@@ -82,7 +84,7 @@ export default async function CustomerShopPage({
 
       <div className="mt-5">
         <div className="panel p-5 text-sm text-slate-700">
-          <p className="text-sm text-slate-500">Price list</p>
+          <p className="eyebrow">Price list</p>
           <p className="mt-3">
             B/W single: {formatCurrency(shop.pricing.blackWhiteSingle)}
           </p>

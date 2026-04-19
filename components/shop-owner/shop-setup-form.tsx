@@ -68,15 +68,13 @@ export function ShopSetupForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="panel mx-auto max-w-3xl p-8">
+    <form onSubmit={handleSubmit} className="panel-strong mx-auto max-w-4xl p-8">
       <div className="mb-6">
-        <p className="mb-2 text-sm font-semibold uppercase tracking-[0.25em] text-teal-700">
-          Shop setup
-        </p>
-        <h1 className="text-3xl font-bold text-slate-900">
+        <p className="eyebrow">Shop setup</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-900">
           {shop ? "Manage your print shop" : "Create your print shop"}
         </h1>
-        <p className="mt-3 text-sm leading-6 text-slate-600">
+        <p className="mt-3 text-sm leading-7 text-slate-600">
           Set your shop details, services, and base print prices so customers know the expected cost.
         </p>
         <p className="mt-2 text-xs leading-6 text-slate-500">
@@ -199,7 +197,7 @@ export function ShopSetupForm({
         <div className="md:col-span-2">
           <p className="label">Razorpay settlement</p>
           {hasLinkedAccount ? (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            <div className="rounded-[24px] border border-[#eadfd3] bg-[rgba(255,248,241,0.82)] p-4 text-sm text-slate-600">
               <p className="font-semibold text-slate-900">
                 Linked account: {shop?.razorpayLinkedAccountId}
               </p>

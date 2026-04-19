@@ -29,7 +29,7 @@ export function LogoutButton() {
       type="button"
       onClick={handleLogout}
       disabled={loading}
-      className="btn-secondary"
+      className="btn-ghost"
       suppressHydrationWarning
     >
       {loading ? "Signing out..." : "Sign out"}

@@ -45,8 +45,9 @@ export function CustomerOrdersList({
           <article key={order.id} className="panel p-5">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div>
-                <div className="flex items-center gap-3">
-                  <h3 className="text-lg font-semibold text-slate-900">
+                <p className="eyebrow">Order</p>
+                <div className="mt-2 flex items-center gap-3">
+                  <h3 className="text-xl font-semibold tracking-[-0.03em] text-slate-900">
                     {shop?.shopName || "Shop"}
                   </h3>
                   <span className={`badge ${statusClassName(order.status)}`}>
@@ -84,11 +85,11 @@ export function CustomerOrdersList({
                   {order.sideType === "double_side" ? "Double side" : "Single side"} |{" "}
                   {order.copies} copies
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-4 flex flex-wrap gap-2">
                   {order.files.map((file) => (
                     <span
                       key={file.id}
-                      className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
+                      className="rounded-full bg-[#f5e5d7] px-3 py-1 text-xs font-semibold text-[#6a4d3a]"
                     >
                       {file.originalFileName}
                     </span>
@@ -96,7 +97,7 @@ export function CustomerOrdersList({
                 </div>
               </div>
 
-              <div className="text-left md:text-right">
+              <div className="rounded-[24px] bg-[rgba(255,247,239,0.95)] p-4 text-left md:min-w-56 md:text-right">
                 {order.finalAmount !== null && order.finalAmount !== undefined ? (
                   <>
                     <p className="text-sm text-slate-500">Final amount</p>

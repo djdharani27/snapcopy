@@ -8,7 +8,7 @@ import {
   MAX_FILE_SIZE_BYTES,
   MAX_FILES_PER_ORDER,
 } from "@/lib/utils/constants";
-import { formatCurrency, formatTrackingId } from "@/lib/utils/format";
+import { formatTrackingId } from "@/lib/utils/format";
 import type { Shop, UserProfile } from "@/types";
 
 export function UploadOrderForm({
@@ -128,174 +128,200 @@ export function UploadOrderForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="panel p-6">
+    <form onSubmit={handleSubmit} className="panel-strong p-4 sm:p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-semibold text-slate-900">Place your print order</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          Upload your files first, then choose the shop that should handle the order.
-          Accepted formats: PDF, DOC, DOCX, PNG, JPG. Maximum 10 files, 15 MB each.
+        <p className="eyebrow">Order builder</p>
+        <h2 className="mt-2 text-xl font-semibold tracking-[-0.04em] text-slate-900 sm:text-2xl">
+          Build your print request
+        </h2>
+        <p className="mt-3 text-sm leading-7 text-slate-600">
+          Add files, pick the shop, confirm the print specs, then send. Formats: PDF, DOC, DOCX,
+          PNG, JPG. Maximum 10 files, 15 MB each.
         </p>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2">
-        <div className="md:col-span-2">
-          <label className="label" htmlFor="files">
-            Files
-          </label>
+      <div className="space-y-5">
+        <section className="rounded-[28px] border border-[#eadfd3] bg-[rgba(255,248,241,0.82)] p-4 sm:p-5">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+            <div>
+              <p className="label">Step 1</p>
+              <h3 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-slate-900">
+                Add files and pick the shop
+              </h3>
+            </div>
+            <div className="inline-flex w-fit rounded-full bg-[#f5decc] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#9c4c20]">
+              Required
+            </div>
+          </div>
+
           <input
             id="files"
             name="files"
             type="file"
             multiple
             accept={ACCEPTED_FILE_EXTENSIONS}
-            className="input py-2.5"
+            className="input py-3"
             required
           />
-        </div>
 
-        <div className="md:col-span-2">
-          <label className="label" htmlFor="shopId">
-            Select shop
-          </label>
-          <select
-            id="shopId"
-            name="shopId"
-            className="input"
-            value={selectedShopId}
-            onChange={(event) => setSelectedShopId(event.target.value)}
-            required
-          >
-            <option value="" disabled>
-              Choose a shop
-            </option>
-            {shops.map((shop) => (
-              <option key={shop.id} value={shop.id}>
-                {shop.shopName} - {shop.address}
+          <div className="mt-4">
+            <label className="label" htmlFor="shopId">
+              Print shop
+            </label>
+            <select
+              id="shopId"
+              name="shopId"
+              className="input"
+              value={selectedShopId}
+              onChange={(event) => setSelectedShopId(event.target.value)}
+              required
+            >
+              <option value="" disabled>
+                Choose a shop
               </option>
-            ))}
-          </select>
-        </div>
+              {shops.map((shop) => (
+                <option key={shop.id} value={shop.id}>
+                  {shop.shopName} - {shop.address}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        {selectedShop ? (
-          <div className="md:col-span-2 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-            <p className="font-semibold text-slate-900">{selectedShop.shopName}</p>
-            <p className="mt-1">{selectedShop.address}</p>
-            <p className="mt-3 text-xs uppercase tracking-[0.18em] text-slate-500">
-              Starting prices
-            </p>
-            <div className="mt-2 grid gap-2 md:grid-cols-2">
-              <p>B/W single: {formatCurrency(selectedShop.pricing.blackWhiteSingle)}</p>
-              <p>B/W double: {formatCurrency(selectedShop.pricing.blackWhiteDouble)}</p>
-              <p>Color single: {formatCurrency(selectedShop.pricing.colorSingle)}</p>
-              <p>Color double: {formatCurrency(selectedShop.pricing.colorDouble)}</p>
+        </section>
+
+        <section className="rounded-[28px] border border-[#eadfd3] bg-[rgba(255,253,249,0.86)] p-4 sm:p-5">
+          <div className="mb-4">
+            <p className="label">Step 2</p>
+            <h3 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-slate-900">
+              Confirm your details
+            </h3>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            <div>
+              <label className="label" htmlFor="customerName">
+                Customer name
+              </label>
+              <input
+                id="customerName"
+                name="customerName"
+                className="input"
+                defaultValue={profile.name}
+                required
+              />
+            </div>
+
+            {profile.phone ? (
+              <input type="hidden" name="customerPhone" value={profile.phone} />
+            ) : (
+              <div>
+                <label className="label" htmlFor="customerPhone">
+                  Phone number
+                </label>
+                <input
+                  id="customerPhone"
+                  name="customerPhone"
+                  className="input"
+                  placeholder="Saved after your first order"
+                  required
+                />
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-[28px] border border-[#eadfd3] bg-[rgba(255,248,241,0.7)] p-4 sm:p-5">
+          <div className="mb-4">
+            <p className="label">Step 3</p>
+            <h3 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-slate-900">
+              Print style
+            </h3>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            <div>
+              <label className="label" htmlFor="printType">
+                Print type
+              </label>
+              <select
+                id="printType"
+                name="printType"
+                className="input"
+                value={printType}
+                onChange={(event) => setPrintType(event.target.value as "color" | "black_white")}
+              >
+                <option value="black_white">Black &amp; white</option>
+                <option value="color">Color</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="label" htmlFor="sideType">
+                Side type
+              </label>
+              <select
+                id="sideType"
+                name="sideType"
+                className="input"
+                value={sideType}
+                onChange={(event) =>
+                  setSideType(event.target.value as "single_side" | "double_side")
+                }
+              >
+                <option value="single_side">Single side</option>
+                <option value="double_side">Double side</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="label" htmlFor="copies">
+                Copies
+              </label>
+              <input
+                id="copies"
+                name="copies"
+                type="number"
+                min="1"
+                value={copies}
+                onChange={(event) => setCopies(Number(event.target.value) || 1)}
+                className="input"
+                required
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="label" htmlFor="notes">
+                Notes
+              </label>
+              <textarea
+                id="notes"
+                name="notes"
+                rows={4}
+                className="input min-h-28"
+                placeholder="Optional instructions for the shop"
+              />
             </div>
           </div>
-        ) : null}
-
-        <div>
-          <label className="label" htmlFor="customerName">
-            Customer name
-          </label>
-          <input
-            id="customerName"
-            name="customerName"
-            className="input"
-            defaultValue={profile.name}
-            required
-          />
-        </div>
-
-        {profile.phone ? (
-          <input type="hidden" name="customerPhone" value={profile.phone} />
-        ) : (
-          <div>
-            <label className="label" htmlFor="customerPhone">
-              Phone number
-            </label>
-            <input
-              id="customerPhone"
-              name="customerPhone"
-              className="input"
-              placeholder="Saved after your first order"
-              required
-            />
-          </div>
-        )}
-
-        <div>
-          <label className="label" htmlFor="printType">
-            Print type
-          </label>
-          <select
-            id="printType"
-            name="printType"
-            className="input"
-            value={printType}
-            onChange={(event) => setPrintType(event.target.value as "color" | "black_white")}
-          >
-            <option value="black_white">Black &amp; white</option>
-            <option value="color">Color</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="label" htmlFor="sideType">
-            Side type
-          </label>
-          <select
-            id="sideType"
-            name="sideType"
-            className="input"
-            value={sideType}
-            onChange={(event) =>
-              setSideType(event.target.value as "single_side" | "double_side")
-            }
-          >
-            <option value="single_side">Single side</option>
-            <option value="double_side">Double side</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="label" htmlFor="copies">
-            Copies
-          </label>
-          <input
-            id="copies"
-            name="copies"
-            type="number"
-            min="1"
-            value={copies}
-            onChange={(event) => setCopies(Number(event.target.value) || 1)}
-            className="input"
-            required
-          />
-        </div>
-      </div>
-
-      <div className="mt-5">
-        <label className="label" htmlFor="notes">
-          Notes
-        </label>
-        <textarea
-          id="notes"
-          name="notes"
-          rows={4}
-          className="input"
-          placeholder="Optional instructions for the shop"
-        />
+        </section>
       </div>
 
       {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
-      <div className="mt-6 flex justify-end">
-        <button type="submit" disabled={loading || showSuccessDialog} className="btn-primary">
-          {loading ? "Submitting..." : "Upload and place order"}
+      <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-[#776b61]">
+          The shop receives your files right after submission.
+        </p>
+        <button
+          type="submit"
+          disabled={loading || showSuccessDialog}
+          className="btn-primary w-full sm:w-auto"
+        >
+          {loading ? "Submitting..." : "Send print order"}
         </button>
       </div>
 
       {showSuccessDialog ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
-          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
+          <div className="panel-strong w-full max-w-sm p-6">
             <h3 className="text-xl font-semibold text-slate-900">Order sent</h3>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               Your documents were sent to {submittedShop?.shopName || "the selected shop"}. Click
@@ -310,11 +336,7 @@ export function UploadOrderForm({
               </p>
             ) : null}
             <div className="mt-6 flex justify-end">
-              <button
-                type="button"
-                onClick={handleSuccessConfirm}
-                className="btn-primary"
-              >
+              <button type="button" onClick={handleSuccessConfirm} className="btn-primary">
                 OK
               </button>
             </div>

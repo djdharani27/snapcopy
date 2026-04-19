@@ -43,6 +43,7 @@ function mapDoc<T>(id: string, data: FirebaseFirestore.DocumentData) {
     ...data,
     createdAt: timestampToIso(data.createdAt),
     paidAt: timestampToIso(data.paidAt),
+    downloadedAt: timestampToIso(data.downloadedAt),
   } as T;
 }
 
@@ -109,6 +110,14 @@ function normalizeOrder(order: Order): Order {
     transferStatus: order.transferStatus || "not_created",
     linkedAccountId: order.linkedAccountId || null,
     paidAt: order.paidAt || null,
+  };
+}
+
+function normalizeOrderFile(file: OrderFile): OrderFile {
+  return {
+    ...file,
+    downloadedAt: file.downloadedAt || null,
+    downloadedByOwnerId: file.downloadedByOwnerId || null,
   };
 }
 
@@ -346,6 +355,8 @@ export async function createOrderWithFiles(params: {
       s3Url: file.s3Url,
       mimeType: file.mimeType,
       size: file.size,
+      downloadedAt: null,
+      downloadedByOwnerId: null,
       createdAt: FieldValue.serverTimestamp(),
     });
   });
@@ -389,7 +400,7 @@ export async function getFilesByOrderIds(orderIds: string[]) {
         .get();
 
       snapshot.docs.forEach((doc) => {
-        const file = mapDoc<OrderFile>(doc.id, doc.data());
+        const file = normalizeOrderFile(mapDoc<OrderFile>(doc.id, doc.data()));
         grouped[file.orderId] = [...(grouped[file.orderId] ?? []), file];
       });
     }),
@@ -622,7 +633,22 @@ export async function markWebhookEventProcessed(params: {
 export async function getOrderFileById(fileId: string) {
   const snapshot = await adminDb().collection("order_files").doc(fileId).get();
   if (!snapshot.exists) return null;
-  return mapDoc<OrderFile>(snapshot.id, snapshot.data() ?? {});
+  return normalizeOrderFile(mapDoc<OrderFile>(snapshot.id, snapshot.data() ?? {}));
+}
+
+export async function markOrderFileDownloaded(params: {
+  fileId: string;
+  ownerId: string;
+}) {
+  await adminDb().collection("order_files").doc(params.fileId).set(
+    {
+      downloadedAt: FieldValue.serverTimestamp(),
+      downloadedByOwnerId: params.ownerId,
+    },
+    { merge: true },
+  );
+
+  return getOrderFileById(params.fileId);
 }
 
 async function deleteDocumentsByRefs(
@@ -665,8 +691,13 @@ export async function deleteShopWithRelatedData(shopId: string) {
 }
 
 export async function deleteAllOrderFileRecords() {
-  const snapshot = await adminDb().collection("order_files").get();
-  const files = snapshot.docs.map((doc) => mapDoc<OrderFile>(doc.id, doc.data() ?? {}));
+  const snapshot = await adminDb()
+    .collection("order_files")
+    .where("downloadedAt", "!=", null)
+    .get();
+  const files = snapshot.docs.map((doc) =>
+    normalizeOrderFile(mapDoc<OrderFile>(doc.id, doc.data() ?? {})),
+  );
 
   await deleteDocumentsByRefs(snapshot.docs.map((doc) => doc.ref));
 
