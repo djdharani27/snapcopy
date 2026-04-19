@@ -52,7 +52,9 @@ export default async function ShopOwnerRevenuePage() {
     const current = dailyMetrics.get(key) ?? { orderCount: 0, revenue: 0 };
 
     current.orderCount += 1;
-    if (order.finalAmount) {
+    if (order.transferableAmountPaise) {
+      current.revenue += Number(order.transferableAmountPaise) / 100;
+    } else if (order.finalAmount) {
       current.revenue += Number(order.finalAmount);
     }
 
@@ -77,7 +79,7 @@ export default async function ShopOwnerRevenuePage() {
     <DashboardShell
       profile={profile}
       title={`${shop.shopName} revenue`}
-      description="Track daily paid order totals and revenue for your shop."
+      description="Track daily paid order totals and the calculated payout sent to your Razorpay linked account."
       actions={
         <>
           <ShopOwnerNav active="revenue" />
@@ -110,7 +112,7 @@ export default async function ShopOwnerRevenuePage() {
           <div className="border-b border-slate-200 px-5 py-4">
             <h2 className="text-xl font-semibold text-slate-900">Daily totals</h2>
             <p className="mt-1 text-sm text-slate-600">
-              Only paid orders are included in these totals.
+              Only paid orders are included. Revenue reflects the server-calculated payout after the flat platform fee and payment-processing costs.
             </p>
           </div>
           <div className="overflow-x-auto">

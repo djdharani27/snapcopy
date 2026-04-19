@@ -7,6 +7,10 @@ import {
   formatTrackingId,
   statusClassName,
 } from "@/lib/utils/format";
+import {
+  canShopReceiveOnlinePayments,
+  getShopPaymentUnavailableMessage,
+} from "@/lib/payments/shop-readiness";
 import type { OrderWithFiles, Shop, UserProfile } from "@/types";
 
 export function CustomerOrdersList({
@@ -30,6 +34,12 @@ export function CustomerOrdersList({
     <div className="space-y-4">
       {orders.map((order) => {
         const shop = shopsById[order.shopId];
+        const canReceiveOnlinePayments = canShopReceiveOnlinePayments(shop);
+        const shouldShowPaymentAction =
+          order.status === "completed" &&
+          order.finalAmount !== null &&
+          order.finalAmount !== undefined &&
+          order.paymentStatus !== "paid";
 
         return (
           <article key={order.id} className="panel p-5">
@@ -97,10 +107,7 @@ export function CustomerOrdersList({
                 ) : (
                   <p className="text-sm text-slate-500">Awaiting final amount</p>
                 )}
-                {order.status === "completed" &&
-                order.finalAmount !== null &&
-                order.finalAmount !== undefined &&
-                order.paymentStatus !== "paid" ? (
+                {shouldShowPaymentAction && canReceiveOnlinePayments ? (
                   <PayOrderButton
                     orderId={order.id}
                     amount={Number(order.finalAmount)}
@@ -108,6 +115,11 @@ export function CustomerOrdersList({
                     email={profile.email}
                     phone={profile.phone}
                   />
+                ) : null}
+                {shouldShowPaymentAction && !canReceiveOnlinePayments ? (
+                  <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    {getShopPaymentUnavailableMessage()} Contact the shop to complete the payment offline.
+                  </div>
                 ) : null}
                 {order.paymentStatus === "paid" ? (
                   <div className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">

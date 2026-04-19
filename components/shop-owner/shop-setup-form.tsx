@@ -2,12 +2,19 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Shop } from "@/types";
+import type { Shop, UserProfile } from "@/types";
 
-export function ShopSetupForm({ shop }: { shop?: Shop | null }) {
+export function ShopSetupForm({
+  shop,
+  profile,
+}: {
+  shop?: Shop | null;
+  profile: UserProfile;
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const hasLinkedAccount = Boolean(shop?.razorpayLinkedAccountId);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -23,10 +30,16 @@ export function ShopSetupForm({ shop }: { shop?: Shop | null }) {
         body: JSON.stringify({
           shopName: formData.get("shopName"),
           address: formData.get("address"),
+          city: formData.get("city"),
+          state: formData.get("state"),
+          postalCode: formData.get("postalCode"),
           googleMapsUrl: formData.get("googleMapsUrl"),
           phone: formData.get("phone"),
           description: formData.get("description"),
           services: formData.get("services"),
+          bankAccountHolderName: formData.get("bankAccountHolderName"),
+          bankIfsc: formData.get("bankIfsc"),
+          bankAccountNumber: formData.get("bankAccountNumber"),
           pricing: {
             blackWhiteSingle: formData.get("blackWhiteSingle"),
             blackWhiteDouble: formData.get("blackWhiteDouble"),
@@ -66,6 +79,9 @@ export function ShopSetupForm({ shop }: { shop?: Shop | null }) {
         <p className="mt-3 text-sm leading-6 text-slate-600">
           Set your shop details, services, and base print prices so customers know the expected cost.
         </p>
+        <p className="mt-2 text-xs leading-6 text-slate-500">
+          Razorpay linked account email: {profile.email || "missing email on your profile"}
+        </p>
       </div>
 
       <div className="grid gap-5 md:grid-cols-2">
@@ -84,13 +100,54 @@ export function ShopSetupForm({ shop }: { shop?: Shop | null }) {
 
         <div className="md:col-span-2">
           <label className="label" htmlFor="address">
-            Address
+            Street address
           </label>
           <input
             id="address"
             name="address"
             className="input"
             defaultValue={shop?.address || ""}
+            required
+          />
+        </div>
+
+        <div>
+          <label className="label" htmlFor="city">
+            City
+          </label>
+          <input
+            id="city"
+            name="city"
+            className="input"
+            defaultValue={shop?.city || ""}
+            required
+          />
+        </div>
+
+        <div>
+          <label className="label" htmlFor="state">
+            State
+          </label>
+          <input
+            id="state"
+            name="state"
+            className="input"
+            defaultValue={shop?.state || ""}
+            required
+          />
+        </div>
+
+        <div>
+          <label className="label" htmlFor="postalCode">
+            Pincode
+          </label>
+          <input
+            id="postalCode"
+            name="postalCode"
+            className="input"
+            inputMode="numeric"
+            pattern="[0-9]{6}"
+            defaultValue={shop?.postalCode || ""}
             required
           />
         </div>
@@ -137,6 +194,76 @@ export function ShopSetupForm({ shop }: { shop?: Shop | null }) {
             defaultValue={shop?.description || ""}
             placeholder="Short shop summary"
           />
+        </div>
+
+        <div className="md:col-span-2">
+          <p className="label">Razorpay settlement</p>
+          {hasLinkedAccount ? (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              <p className="font-semibold text-slate-900">
+                Linked account: {shop?.razorpayLinkedAccountId}
+              </p>
+              <p className="mt-2">
+                Status: {shop?.razorpayLinkedAccountStatus || "created"}
+              </p>
+              <p className="mt-2">
+                Beneficiary: {shop?.bankAccountHolderName || "-"}
+              </p>
+              <p className="mt-2">
+                Bank: {shop?.bankIfsc || "-"} / xxxx{shop?.bankAccountLast4 || ""}
+              </p>
+              <p className="mt-2 text-xs text-slate-500">
+                This shop already has a Razorpay linked account. After payment verification, the server creates the Route transfer to this account.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-5 md:grid-cols-2">
+              <div>
+                <label className="label" htmlFor="bankAccountHolderName">
+                  Account holder name
+                </label>
+                <input
+                  id="bankAccountHolderName"
+                  name="bankAccountHolderName"
+                  className="input"
+                  defaultValue={shop?.bankAccountHolderName || profile.name || ""}
+                  required={!hasLinkedAccount}
+                />
+              </div>
+
+              <div>
+                <label className="label" htmlFor="bankIfsc">
+                  IFSC
+                </label>
+                <input
+                  id="bankIfsc"
+                  name="bankIfsc"
+                  className="input"
+                  defaultValue={shop?.bankIfsc || ""}
+                  placeholder="HDFC0001234"
+                  required={!hasLinkedAccount}
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="label" htmlFor="bankAccountNumber">
+                  Bank account number
+                </label>
+                <input
+                  id="bankAccountNumber"
+                  name="bankAccountNumber"
+                  className="input"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="Enter the settlement bank account number"
+                  required={!hasLinkedAccount}
+                />
+                <p className="mt-2 text-xs text-slate-500">
+                  The full account number is used only during onboarding. Only the last 4 digits are stored in this app.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="md:col-span-2">

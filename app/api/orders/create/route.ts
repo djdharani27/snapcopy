@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireApiRole } from "@/lib/auth/session";
-import {
-  getOrderById,
-  prepareOrderPayment,
-} from "@/lib/firebase/firestore-admin";
+import { getOrderById, getShopById, prepareOrderPayment } from "@/lib/firebase/firestore-admin";
 import { createRazorpayOrder, getRazorpayKeyId } from "@/lib/payments/razorpay";
+import {
+  canShopReceiveOnlinePayments,
+  getShopPaymentUnavailableMessage,
+} from "@/lib/payments/shop-readiness";
 
 export async function POST(request: Request) {
   try {
@@ -36,8 +37,14 @@ export async function POST(request: Request) {
     }
 
     if (order.paymentStatus === "paid") {
+      return NextResponse.json({ error: "This order is already paid." }, { status: 400 });
+    }
+
+    const shop = await getShopById(order.shopId);
+
+    if (!canShopReceiveOnlinePayments(shop)) {
       return NextResponse.json(
-        { error: "This order is already paid." },
+        { error: getShopPaymentUnavailableMessage() },
         { status: 400 },
       );
     }

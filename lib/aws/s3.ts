@@ -1,5 +1,7 @@
 import {
+  DeleteObjectsCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -83,4 +85,54 @@ export async function getDownloadUrl(key: string) {
     }),
     { expiresIn: 60 * 10 },
   );
+}
+
+export async function deleteS3Objects(keys: string[]) {
+  const uniqueKeys = Array.from(new Set(keys.filter(Boolean)));
+  if (uniqueKeys.length === 0) {
+    return 0;
+  }
+
+  const client = getS3Client();
+  let deletedCount = 0;
+
+  for (let index = 0; index < uniqueKeys.length; index += 1000) {
+    const chunk = uniqueKeys.slice(index, index + 1000);
+    await client.send(
+      new DeleteObjectsCommand({
+        Bucket: getBucketName(),
+        Delete: {
+          Objects: chunk.map((key) => ({ Key: key })),
+          Quiet: true,
+        },
+      }),
+    );
+    deletedCount += chunk.length;
+  }
+
+  return deletedCount;
+}
+
+export async function listAllS3Keys() {
+  const client = getS3Client();
+  const keys: string[] = [];
+  let continuationToken: string | undefined;
+
+  do {
+    const response = await client.send(
+      new ListObjectsV2Command({
+        Bucket: getBucketName(),
+        ContinuationToken: continuationToken,
+      }),
+    );
+
+    keys.push(
+      ...(response.Contents ?? [])
+        .map((item) => item.Key)
+        .filter((key): key is string => Boolean(key)),
+    );
+    continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  return keys;
 }

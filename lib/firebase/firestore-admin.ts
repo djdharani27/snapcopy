@@ -49,11 +49,19 @@ function mapDoc<T>(id: string, data: FirebaseFirestore.DocumentData) {
 function normalizeShop(shop: Shop): Shop {
   return {
     ...shop,
+    city: String(shop.city || "").trim(),
+    state: String(shop.state || "").trim(),
+    postalCode: String(shop.postalCode || "").trim(),
     googleMapsUrl: normalizeGoogleMapsUrl(
       (shop as Shop & { location?: string }).googleMapsUrl ||
         (shop as Shop & { location?: string }).location,
     ),
     services: Array.isArray(shop.services) ? shop.services : [],
+    razorpayLinkedAccountId: String(shop.razorpayLinkedAccountId || "").trim(),
+    razorpayLinkedAccountStatus: String(shop.razorpayLinkedAccountStatus || "").trim(),
+    bankAccountHolderName: String(shop.bankAccountHolderName || "").trim(),
+    bankIfsc: String(shop.bankIfsc || "").trim(),
+    bankAccountLast4: String(shop.bankAccountLast4 || "").trim(),
     pricing: {
       blackWhiteSingle: Number(shop.pricing?.blackWhiteSingle || 0),
       blackWhiteDouble: Number(shop.pricing?.blackWhiteDouble || 0),
@@ -74,6 +82,32 @@ function normalizeOrder(order: Order): Order {
     paymentStatus: order.paymentStatus || "unpaid",
     razorpayOrderId: order.razorpayOrderId || null,
     razorpayPaymentId: order.razorpayPaymentId || null,
+    platformCommissionPaise:
+      order.platformCommissionPaise === null || order.platformCommissionPaise === undefined
+        ? null
+        : Number(order.platformCommissionPaise),
+    platformTransactionFeePaise:
+      order.platformTransactionFeePaise === null ||
+      order.platformTransactionFeePaise === undefined
+        ? order.platformCommissionPaise === null || order.platformCommissionPaise === undefined
+          ? null
+          : Number(order.platformCommissionPaise)
+        : Number(order.platformTransactionFeePaise),
+    estimatedFeePaise:
+      order.estimatedFeePaise === null || order.estimatedFeePaise === undefined
+        ? null
+        : Number(order.estimatedFeePaise),
+    estimatedTaxPaise:
+      order.estimatedTaxPaise === null || order.estimatedTaxPaise === undefined
+        ? null
+        : Number(order.estimatedTaxPaise),
+    transferableAmountPaise:
+      order.transferableAmountPaise === null || order.transferableAmountPaise === undefined
+        ? null
+        : Number(order.transferableAmountPaise),
+    transferId: order.transferId || null,
+    transferStatus: order.transferStatus || "not_created",
+    linkedAccountId: order.linkedAccountId || null,
     paidAt: order.paidAt || null,
   };
 }
@@ -109,6 +143,17 @@ export async function upsertUserProfile(params: {
   return getUserProfileById(params.uid);
 }
 
+export async function getUsersByRole(role: UserRole) {
+  const snapshot = await adminDb()
+    .collection("users")
+    .where("role", "==", role)
+    .get();
+
+  return snapshot.docs
+    .map((doc) => mapDoc<UserProfile>(doc.id, doc.data() ?? {}))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export async function getAllShops() {
   const snapshot = await adminDb()
     .collection("shops")
@@ -140,10 +185,18 @@ export async function createShop(params: {
   ownerId: string;
   shopName: string;
   address: string;
+  city: string;
+  state: string;
+  postalCode: string;
   googleMapsUrl?: string;
   phone: string;
   description: string;
   services: string[];
+  razorpayLinkedAccountId: string;
+  razorpayLinkedAccountStatus?: string;
+  bankAccountHolderName?: string;
+  bankIfsc?: string;
+  bankAccountLast4?: string;
   pricing: Shop["pricing"];
 }) {
   const existing = await getShopByOwnerId(params.ownerId);
@@ -157,10 +210,18 @@ export async function createShop(params: {
     ownerId: params.ownerId,
     shopName: params.shopName,
     address: params.address,
+    city: params.city,
+    state: params.state,
+    postalCode: params.postalCode,
     googleMapsUrl: params.googleMapsUrl || "",
     phone: params.phone,
     description: params.description,
     services: params.services,
+    razorpayLinkedAccountId: params.razorpayLinkedAccountId,
+    razorpayLinkedAccountStatus: params.razorpayLinkedAccountStatus || "created",
+    bankAccountHolderName: params.bankAccountHolderName || "",
+    bankIfsc: params.bankIfsc || "",
+    bankAccountLast4: params.bankAccountLast4 || "",
     pricing: params.pricing,
     createdAt: FieldValue.serverTimestamp(),
   });
@@ -173,10 +234,18 @@ export async function updateShop(params: {
   ownerId: string;
   shopName: string;
   address: string;
+  city: string;
+  state: string;
+  postalCode: string;
   googleMapsUrl?: string;
   phone: string;
   description: string;
   services: string[];
+  razorpayLinkedAccountId: string;
+  razorpayLinkedAccountStatus?: string;
+  bankAccountHolderName?: string;
+  bankIfsc?: string;
+  bankAccountLast4?: string;
   pricing: Shop["pricing"];
 }) {
   const existing = await getShopById(params.shopId);
@@ -188,10 +257,18 @@ export async function updateShop(params: {
     {
       shopName: params.shopName,
       address: params.address,
+      city: params.city,
+      state: params.state,
+      postalCode: params.postalCode,
       googleMapsUrl: params.googleMapsUrl || "",
       phone: params.phone,
       description: params.description,
       services: params.services,
+      razorpayLinkedAccountId: params.razorpayLinkedAccountId,
+      razorpayLinkedAccountStatus: params.razorpayLinkedAccountStatus || "created",
+      bankAccountHolderName: params.bankAccountHolderName || "",
+      bankIfsc: params.bankIfsc || "",
+      bankAccountLast4: params.bankAccountLast4 || "",
       pricing: params.pricing,
     },
     { merge: true },
@@ -246,6 +323,14 @@ export async function createOrderWithFiles(params: {
     paymentStatus: "unpaid",
     razorpayOrderId: null,
     razorpayPaymentId: null,
+    platformCommissionPaise: null,
+    platformTransactionFeePaise: null,
+    estimatedFeePaise: null,
+    estimatedTaxPaise: null,
+    transferableAmountPaise: null,
+    transferId: null,
+    transferStatus: "not_created",
+    linkedAccountId: null,
     paidAt: null,
     status: "pending",
     createdAt,
@@ -382,6 +467,14 @@ export async function prepareOrderPayment(params: {
     {
       razorpayOrderId: params.razorpayOrderId,
       paymentStatus: "unpaid",
+      platformCommissionPaise: null,
+      platformTransactionFeePaise: null,
+      estimatedFeePaise: null,
+      estimatedTaxPaise: null,
+      transferableAmountPaise: null,
+      transferId: null,
+      transferStatus: "not_created",
+      linkedAccountId: null,
     },
     { merge: true },
   );
@@ -407,8 +500,178 @@ export async function markOrderPaid(params: {
   return getOrderById(params.orderId);
 }
 
+export async function updateOrderTransferSnapshot(params: {
+  orderId: string;
+  linkedAccountId: string;
+  platformTransactionFeePaise: number;
+  estimatedFeePaise: number;
+  estimatedTaxPaise: number;
+  transferableAmountPaise: number;
+}) {
+  await adminDb().collection("orders").doc(params.orderId).set(
+    {
+      linkedAccountId: params.linkedAccountId,
+      platformTransactionFeePaise: params.platformTransactionFeePaise,
+      estimatedFeePaise: params.estimatedFeePaise,
+      estimatedTaxPaise: params.estimatedTaxPaise,
+      transferableAmountPaise: params.transferableAmountPaise,
+    },
+    { merge: true },
+  );
+
+  return getOrderById(params.orderId);
+}
+
+export async function updateOrderTransferState(params: {
+  orderId: string;
+  transferId?: string | null;
+  transferStatus: Order["transferStatus"];
+}) {
+  await adminDb().collection("orders").doc(params.orderId).set(
+    {
+      transferId: params.transferId ?? null,
+      transferStatus: params.transferStatus,
+    },
+    { merge: true },
+  );
+
+  return getOrderById(params.orderId);
+}
+
+export async function claimOrderTransferCreation(orderId: string) {
+  const ref = adminDb().collection("orders").doc(orderId);
+
+  return adminDb().runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(ref);
+
+    if (!snapshot.exists) {
+      throw new Error("Order not found.");
+    }
+
+    const data = snapshot.data() ?? {};
+    const transferStatus = String(data.transferStatus || "not_created");
+
+    if (data.transferId || transferStatus === "processing" || transferStatus === "success") {
+      return false;
+    }
+
+    transaction.set(
+      ref,
+      {
+        transferStatus: "processing",
+      },
+      { merge: true },
+    );
+
+    return true;
+  });
+}
+
+export async function getOrderByPaymentId(paymentId: string) {
+  const snapshot = await adminDb()
+    .collection("orders")
+    .where("razorpayPaymentId", "==", paymentId)
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) return null;
+
+  return getOrderById(snapshot.docs[0].id);
+}
+
+export async function getOrderByRazorpayOrderId(razorpayOrderId: string) {
+  const snapshot = await adminDb()
+    .collection("orders")
+    .where("razorpayOrderId", "==", razorpayOrderId)
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) return null;
+
+  return getOrderById(snapshot.docs[0].id);
+}
+
+export async function getOrderByTransferId(transferId: string) {
+  const snapshot = await adminDb()
+    .collection("orders")
+    .where("transferId", "==", transferId)
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) return null;
+
+  return getOrderById(snapshot.docs[0].id);
+}
+
+export async function hasProcessedWebhookEvent(eventId: string) {
+  const snapshot = await adminDb().collection("razorpay_webhook_events").doc(eventId).get();
+  return snapshot.exists;
+}
+
+export async function markWebhookEventProcessed(params: {
+  eventId: string;
+  eventName: string;
+}) {
+  await adminDb().collection("razorpay_webhook_events").doc(params.eventId).set({
+    eventId: params.eventId,
+    eventName: params.eventName,
+    processedAt: FieldValue.serverTimestamp(),
+  });
+}
+
 export async function getOrderFileById(fileId: string) {
   const snapshot = await adminDb().collection("order_files").doc(fileId).get();
   if (!snapshot.exists) return null;
   return mapDoc<OrderFile>(snapshot.id, snapshot.data() ?? {});
+}
+
+async function deleteDocumentsByRefs(
+  refs: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>[],
+) {
+  for (const refsChunk of chunk(refs, 400)) {
+    const batch = adminDb().batch();
+    refsChunk.forEach((ref) => batch.delete(ref));
+    await batch.commit();
+  }
+}
+
+export async function deleteShopWithRelatedData(shopId: string) {
+  const shopRef = adminDb().collection("shops").doc(shopId);
+  const shopSnapshot = await shopRef.get();
+
+  if (!shopSnapshot.exists) {
+    throw new Error("Shop not found.");
+  }
+
+  const orderSnapshot = await adminDb()
+    .collection("orders")
+    .where("shopId", "==", shopId)
+    .get();
+
+  const orderIds = orderSnapshot.docs.map((doc) => doc.id);
+  const orderFilesByOrderId = await getFilesByOrderIds(orderIds);
+  const fileDocs = Object.values(orderFilesByOrderId).flat();
+  const fileRefs = fileDocs.map((file) => adminDb().collection("order_files").doc(file.id));
+
+  await deleteDocumentsByRefs(fileRefs);
+  await deleteDocumentsByRefs(orderSnapshot.docs.map((doc) => doc.ref));
+  await shopRef.delete();
+
+  return {
+    deletedOrderCount: orderSnapshot.size,
+    deletedFileCount: fileDocs.length,
+    s3Keys: fileDocs.map((file) => file.s3Key).filter(Boolean),
+  };
+}
+
+export async function deleteAllOrderFileRecords() {
+  const snapshot = await adminDb().collection("order_files").get();
+  const files = snapshot.docs.map((doc) => mapDoc<OrderFile>(doc.id, doc.data() ?? {}));
+
+  await deleteDocumentsByRefs(snapshot.docs.map((doc) => doc.ref));
+
+  return {
+    deletedFileRecordCount: files.length,
+    s3Keys: files.map((file) => file.s3Key).filter(Boolean),
+  };
 }

@@ -32,7 +32,7 @@ export function PayOrderButton({
     setLoading(true);
 
     try {
-      const createOrderResponse = await fetch("/api/payments/create-order", {
+      const createOrderResponse = await fetch("/api/orders/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderId }),
@@ -74,6 +74,12 @@ export function PayOrderButton({
           const verifyPayload = await verifyResponse.json();
           if (!verifyResponse.ok) {
             throw new Error(verifyPayload.error || "Payment verification failed.");
+          }
+
+          if (verifyPayload.transferError) {
+            window.alert(
+              `Payment received. Shop payout will be retried separately. ${verifyPayload.transferError}`,
+            );
           }
 
           router.refresh();

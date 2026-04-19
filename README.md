@@ -24,7 +24,7 @@ Lean Xerox / print-shop marketplace MVP built with Next.js App Router, Firebase 
 - Shop owner dashboard with incoming orders
 - Download links generated as short-lived signed S3 URLs
 - Order status updates: `pending`, `completed`
-- Razorpay payment collection into your platform account first
+- Razorpay Checkout payment collection with server-side Route transfer creation after payment verification
 
 ## Architecture decisions
 
@@ -69,6 +69,13 @@ Use a Firebase service account from your project settings. Keep the private key 
 
 - `NEXT_PUBLIC_RAZORPAY_KEY_ID`
 - `RAZORPAY_KEY_SECRET`
+- `RAZORPAY_WEBHOOK_SECRET`
+- `PLATFORM_TRANSACTION_FEE_PAISE`
+- `PLATFORM_SHOP_CREATION_FEE_PAISE`
+- `RAZORPAY_ESTIMATED_FEE_PERCENT`
+- `RAZORPAY_ESTIMATED_GST_PERCENT`
+
+Each shop owner needs a Razorpay Route Linked Account. The app creates one during shop setup using the shop details entered in the onboarding form. Platform billing values are stored in Firestore under `platform_settings/billing`, and these env vars only act as fallbacks.
 
 ## Local setup
 
@@ -98,8 +105,16 @@ Use a Firebase service account from your project settings. Keep the private key 
 - `ownerId`: string
 - `shopName`: string
 - `address`: string
+- `city`: string
+- `state`: string
+- `postalCode`: string
 - `phone`: string
 - `description`: string
+- `razorpayLinkedAccountId`: string
+- `razorpayLinkedAccountStatus`: string
+- `bankAccountHolderName`: string
+- `bankIfsc`: string
+- `bankAccountLast4`: string
 - `createdAt`: timestamp
 
 ### `orders`
@@ -118,6 +133,14 @@ Use a Firebase service account from your project settings. Keep the private key 
 - `paymentStatus`: `unpaid | paid`
 - `razorpayOrderId`: string or null
 - `razorpayPaymentId`: string or null
+- `platformCommissionPaise`: number or null, legacy field kept only for backward compatibility
+- `platformTransactionFeePaise`: number or null
+- `estimatedFeePaise`: number or null
+- `estimatedTaxPaise`: number or null
+- `transferableAmountPaise`: number or null
+- `transferId`: string or null
+- `transferStatus`: `not_created | pending | processing | success | failed`
+- `linkedAccountId`: string or null
 - `paidAt`: timestamp or null
 - `createdAt`: timestamp
 
@@ -172,7 +195,14 @@ Deploy [firestore.indexes.json](/C:/Users/gearz/OneDrive/Documents/New----CODE/A
 - This MVP assumes Node.js runtime for S3 uploads.
 - On Vercel or similar platforms, add the same env vars in project settings.
 - If Firebase Admin is missing, protected routes and API uploads will fail by design.
-- Razorpay payments are collected into your platform account first. Paying shop owners at the end of the day is an offline settlement step outside this MVP.
+- Razorpay Route must be enabled on your Razorpay account.
+- Each linked account has a 24-hour cooling period before transfers can be initiated.
+- Shop setup creates the linked account automatically from the submitted shop profile. The current integration defaults the linked-account business type to `proprietorship`.
+- Customer checkout creates a normal Razorpay order with the full amount.
+- After payment verification, the server reads `platform_settings/billing` and calculates the flat transaction fee, estimated processing fee, GST, and transferable amount.
+- The server then creates a separate Razorpay Route transfer from the captured payment to the shop owner's linked account.
+- Webhooks reconcile `payment.captured`, `transfer.processed`, and `transfer.failed` events.
+- Admins can change shop creation fee, transaction fee, gateway fee percent, and GST percent from the Admin panel without a redeploy.
 
 ## Limitations by design
 

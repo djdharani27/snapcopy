@@ -19,6 +19,14 @@ export function formatCurrency(amount: number) {
   }).format(amount || 0);
 }
 
+export function formatPaiseToRupees(amountInPaise: number) {
+  return amountInPaise / 100;
+}
+
+export function formatRupeesToPaise(amountInRupees: number) {
+  return Math.round(amountInRupees * 100);
+}
+
 export function formatTrackingId(
   shopId: string,
   trackingCode?: string | null,

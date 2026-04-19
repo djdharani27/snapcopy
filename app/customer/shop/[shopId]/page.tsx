@@ -78,7 +78,7 @@ export default async function CustomerShopPage({
         </div>
       </div>
 
-      <UploadOrderForm shop={shop} profile={profile} />
+      <UploadOrderForm shops={[shop]} profile={profile} initialShopId={shop.id} />
 
       <div className="mt-5">
         <div className="panel p-5 text-sm text-slate-700">

@@ -2,6 +2,12 @@ export type UserRole = "customer" | "shop_owner";
 
 export type OrderStatus = "pending" | "completed";
 export type PaymentStatus = "unpaid" | "paid";
+export type TransferStatus =
+  | "not_created"
+  | "pending"
+  | "processing"
+  | "success"
+  | "failed";
 
 export type PrintType = "color" | "black_white";
 
@@ -16,15 +22,44 @@ export interface UserProfile {
   createdAt?: string | null;
 }
 
+export interface BillingConfig {
+  shopCreationFeePaise: number;
+  transactionFeePaise: number;
+  estimatedRazorpayFeePercent: number;
+  estimatedGstPercent: number;
+  shopCreationFeeEnabled: boolean;
+  transactionFeeEnabled: boolean;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
+}
+
+export interface BillingAuditLog {
+  id: string;
+  actorEmail: string;
+  actorUid: string;
+  action: string;
+  before: BillingConfig;
+  after: BillingConfig;
+  createdAt?: string | null;
+}
+
 export interface Shop {
   id: string;
   ownerId: string;
   shopName: string;
   address: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
   googleMapsUrl?: string;
   phone: string;
   description: string;
   services: string[];
+  razorpayLinkedAccountId?: string;
+  razorpayLinkedAccountStatus?: string;
+  bankAccountHolderName?: string;
+  bankIfsc?: string;
+  bankAccountLast4?: string;
   pricing: {
     blackWhiteSingle: number;
     blackWhiteDouble: number;
@@ -49,6 +84,14 @@ export interface Order {
   paymentStatus: PaymentStatus;
   razorpayOrderId?: string | null;
   razorpayPaymentId?: string | null;
+  platformCommissionPaise?: number | null;
+  platformTransactionFeePaise?: number | null;
+  estimatedFeePaise?: number | null;
+  estimatedTaxPaise?: number | null;
+  transferableAmountPaise?: number | null;
+  transferId?: string | null;
+  transferStatus?: TransferStatus | null;
+  linkedAccountId?: string | null;
   paidAt?: string | null;
   status: OrderStatus;
   createdAt?: string | null;

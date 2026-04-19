@@ -116,6 +116,40 @@ export function OrdersTable({
                   Final amount: {formatCurrency(order.finalAmount)}
                 </p>
               ) : null}
+              {order.platformTransactionFeePaise !== null &&
+              order.platformTransactionFeePaise !== undefined ? (
+                <p className="mt-2 text-sm text-slate-500">
+                  Platform transaction fee: {formatCurrency(order.platformTransactionFeePaise / 100)}
+                </p>
+              ) : order.platformCommissionPaise !== null &&
+                order.platformCommissionPaise !== undefined ? (
+                <p className="mt-2 text-sm text-slate-500">
+                  Platform transaction fee: {formatCurrency(order.platformCommissionPaise / 100)}
+                </p>
+              ) : null}
+              {order.estimatedFeePaise !== null &&
+              order.estimatedFeePaise !== undefined ? (
+                <p className="mt-2 text-sm text-slate-500">
+                  Payment processing fee: {formatCurrency(order.estimatedFeePaise / 100)}
+                </p>
+              ) : null}
+              {order.estimatedTaxPaise !== null &&
+              order.estimatedTaxPaise !== undefined ? (
+                <p className="mt-2 text-sm text-slate-500">
+                  GST on fee: {formatCurrency(order.estimatedTaxPaise / 100)}
+                </p>
+              ) : null}
+              {order.transferableAmountPaise !== null &&
+              order.transferableAmountPaise !== undefined ? (
+                <p className="mt-2 text-sm font-semibold text-sky-700">
+                  Shop payout: {formatCurrency(order.transferableAmountPaise / 100)}
+                </p>
+              ) : null}
+              {order.transferStatus ? (
+                <p className="mt-2 text-sm text-slate-500">
+                  Transfer status: {order.transferStatus}
+                </p>
+              ) : null}
               {order.paymentStatus === "paid" ? (
                 <p className="mt-2 text-sm font-semibold text-emerald-700">
                   Paid by customer
@@ -171,13 +205,13 @@ export function OrdersTable({
                 <>
                   <p className="label">Completed</p>
                   {order.paymentStatus === "paid" ? (
-                    <p className="text-sm text-slate-600">
-                      Payment is complete. The final amount is locked.
-                    </p>
+                      <p className="text-sm text-slate-600">
+                        Payment is complete. The platform now calculates the flat platform fee, gateway cost, and payout before creating the Route transfer.
+                      </p>
                   ) : (
                     <>
                       <p className="text-sm text-slate-600">
-                        Customer can see this amount. You can still correct it before payment.
+                        Customer can see this amount. After payment, the server calculates the flat platform fee, processing cost, and shop payout.
                       </p>
                       <label className="label mt-4" htmlFor={`amount-${order.id}`}>
                         Correct final amount

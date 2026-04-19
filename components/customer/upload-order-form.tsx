@@ -8,28 +8,35 @@ import {
   MAX_FILE_SIZE_BYTES,
   MAX_FILES_PER_ORDER,
 } from "@/lib/utils/constants";
-import { formatTrackingId } from "@/lib/utils/format";
+import { formatCurrency, formatTrackingId } from "@/lib/utils/format";
 import type { Shop, UserProfile } from "@/types";
 
 export function UploadOrderForm({
-  shop,
+  shops,
   profile,
+  initialShopId,
 }: {
-  shop: Shop;
+  shops: Shop[];
   profile: UserProfile;
+  initialShopId?: string;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [createdTrackingCode, setCreatedTrackingCode] = useState("");
   const [error, setError] = useState("");
+  const [submittedShop, setSubmittedShop] = useState<Shop | null>(null);
   const [printType, setPrintType] = useState<"color" | "black_white">("black_white");
   const [sideType, setSideType] = useState<"single_side" | "double_side">("single_side");
   const [copies, setCopies] = useState(1);
+  const [selectedShopId, setSelectedShopId] = useState(initialShopId || shops[0]?.id || "");
+
+  const selectedShop = shops.find((shop) => shop.id === selectedShopId) || null;
 
   function handleSuccessConfirm() {
     setShowSuccessDialog(false);
     setCreatedTrackingCode("");
+    setSubmittedShop(null);
     router.push("/customer/orders?order=sent#orders");
   }
 
@@ -47,6 +54,10 @@ export function UploadOrderForm({
     );
 
     try {
+      if (!selectedShopId) {
+        throw new Error("Select a shop before placing the order.");
+      }
+
       if (files.length === 0) throw new Error("Add at least one file.");
       if (files.length > MAX_FILES_PER_ORDER) {
         throw new Error(`You can upload up to ${MAX_FILES_PER_ORDER} files.`);
@@ -83,7 +94,7 @@ export function UploadOrderForm({
         body: JSON.stringify({
           customerName: formData.get("customerName"),
           customerPhone: formData.get("customerPhone"),
-          shopId: shop.id,
+          shopId: selectedShopId,
           notes: formData.get("notes"),
           printType: formData.get("printType"),
           sideType: formData.get("sideType"),
@@ -97,10 +108,12 @@ export function UploadOrderForm({
         throw new Error(orderResult.error || "Order creation failed.");
       }
 
+      setSubmittedShop(selectedShop);
       form.reset();
       setPrintType("black_white");
       setSideType("single_side");
       setCopies(1);
+      setSelectedShopId(initialShopId || shops[0]?.id || "");
       setCreatedTrackingCode(orderResult.order?.trackingCode || orderResult.order?.id || "");
       setShowSuccessDialog(true);
     } catch (submissionError) {
@@ -117,16 +130,68 @@ export function UploadOrderForm({
   return (
     <form onSubmit={handleSubmit} className="panel p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-semibold text-slate-900">
-          Send documents to {shop.shopName}
-        </h2>
+        <h2 className="text-2xl font-semibold text-slate-900">Place your print order</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Accepted formats: PDF, DOC, DOCX, PNG, JPG. Maximum 10 files, 15 MB
-          each.
+          Upload your files first, then choose the shop that should handle the order.
+          Accepted formats: PDF, DOC, DOCX, PNG, JPG. Maximum 10 files, 15 MB each.
         </p>
       </div>
 
       <div className="grid gap-5 md:grid-cols-2">
+        <div className="md:col-span-2">
+          <label className="label" htmlFor="files">
+            Files
+          </label>
+          <input
+            id="files"
+            name="files"
+            type="file"
+            multiple
+            accept={ACCEPTED_FILE_EXTENSIONS}
+            className="input py-2.5"
+            required
+          />
+        </div>
+
+        <div className="md:col-span-2">
+          <label className="label" htmlFor="shopId">
+            Select shop
+          </label>
+          <select
+            id="shopId"
+            name="shopId"
+            className="input"
+            value={selectedShopId}
+            onChange={(event) => setSelectedShopId(event.target.value)}
+            required
+          >
+            <option value="" disabled>
+              Choose a shop
+            </option>
+            {shops.map((shop) => (
+              <option key={shop.id} value={shop.id}>
+                {shop.shopName} - {shop.address}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {selectedShop ? (
+          <div className="md:col-span-2 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+            <p className="font-semibold text-slate-900">{selectedShop.shopName}</p>
+            <p className="mt-1">{selectedShop.address}</p>
+            <p className="mt-3 text-xs uppercase tracking-[0.18em] text-slate-500">
+              Starting prices
+            </p>
+            <div className="mt-2 grid gap-2 md:grid-cols-2">
+              <p>B/W single: {formatCurrency(selectedShop.pricing.blackWhiteSingle)}</p>
+              <p>B/W double: {formatCurrency(selectedShop.pricing.blackWhiteDouble)}</p>
+              <p>Color single: {formatCurrency(selectedShop.pricing.colorSingle)}</p>
+              <p>Color double: {formatCurrency(selectedShop.pricing.colorDouble)}</p>
+            </div>
+          </div>
+        ) : null}
+
         <div>
           <label className="label" htmlFor="customerName">
             Customer name
@@ -206,21 +271,6 @@ export function UploadOrderForm({
             required
           />
         </div>
-
-        <div>
-          <label className="label" htmlFor="files">
-            Files
-          </label>
-          <input
-            id="files"
-            name="files"
-            type="file"
-            multiple
-            accept={ACCEPTED_FILE_EXTENSIONS}
-            className="input py-2.5"
-            required
-          />
-        </div>
       </div>
 
       <div className="mt-5">
@@ -248,14 +298,14 @@ export function UploadOrderForm({
           <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
             <h3 className="text-xl font-semibold text-slate-900">Order sent</h3>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Your documents were sent to {shop.shopName}. Click OK to go back to
-              your orders.
+              Your documents were sent to {submittedShop?.shopName || "the selected shop"}. Click
+              OK to go back to your orders.
             </p>
             {createdTrackingCode ? (
               <p className="mt-3 text-sm text-slate-700">
                 Tracking ID:{" "}
                 <span className="font-semibold">
-                  {formatTrackingId(shop.id, createdTrackingCode)}
+                  {formatTrackingId(submittedShop?.id || selectedShopId, createdTrackingCode)}
                 </span>
               </p>
             ) : null}

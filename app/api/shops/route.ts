@@ -6,46 +6,19 @@ import {
   getShopByOwnerId,
   updateShop,
 } from "@/lib/firebase/firestore-admin";
-
-function parseServices(value: unknown) {
-  return String(value || "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function parsePrice(value: unknown) {
-  const numericValue = Number(value);
-  if (Number.isNaN(numericValue) || numericValue < 0) {
-    throw new Error("Pricing values must be valid non-negative numbers.");
-  }
-  return numericValue;
-}
-
-function parseGoogleMapsUrl(value: unknown) {
-  const trimmedValue = String(value || "").trim();
-  if (!trimmedValue) {
-    return "";
-  }
-
-  let url: URL;
-  try {
-    url = new URL(trimmedValue);
-  } catch {
-    throw new Error("Enter a valid Google Maps link.");
-  }
-
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("Enter a valid Google Maps link.");
-  }
-
-  const hostname = url.hostname.toLowerCase();
-  if (!hostname.includes("google.") && !hostname.includes("maps.app.goo.gl")) {
-    throw new Error("Use a Google Maps share link.");
-  }
-
-  return trimmedValue;
-}
+import { createRazorpayLinkedAccount } from "@/lib/payments/razorpay";
+import {
+  maskBankAccount,
+  parseBankAccountNumber,
+  parseGoogleMapsUrl,
+  parseIfsc,
+  parsePhone,
+  parsePrice,
+  parsePostalCode,
+  parseRequiredText,
+  parseRazorpayLinkedAccountId,
+  parseServices,
+} from "@/lib/shops/validation";
 
 export async function GET() {
   try {
@@ -62,14 +35,20 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { decoded } = await requireApiRole("shop_owner");
+    const { decoded, profile } = await requireApiRole("shop_owner");
     const {
       shopName,
       address,
+      city,
+      state,
+      postalCode,
       googleMapsUrl,
       phone,
       description,
       services,
+      bankAccountHolderName,
+      bankIfsc,
+      bankAccountNumber,
       pricing,
     } = await request.json();
 
@@ -87,14 +66,52 @@ export async function POST(request: Request) {
       colorDouble: parsePrice(pricing?.colorDouble),
     };
 
+    if (!profile.email) {
+      throw new Error("Your profile email is required before creating a Razorpay linked account.");
+    }
+
+    const parsedShopName = String(shopName).trim();
+    const parsedAddress = String(address).trim();
+    const parsedCity = parseRequiredText(city, "City");
+    const parsedState = parseRequiredText(state, "State");
+    const parsedPostalCode = parsePostalCode(postalCode);
+    const parsedPhone = parsePhone(phone);
+    const parsedBankAccountHolderName = parseRequiredText(
+      bankAccountHolderName,
+      "Bank account holder name",
+    );
+    const parsedBankIfsc = parseIfsc(bankIfsc);
+    const parsedBankAccountNumber = parseBankAccountNumber(bankAccountNumber);
+
+    const linkedAccount = await createRazorpayLinkedAccount({
+      email: profile.email,
+      phone: parsedPhone,
+      legalBusinessName: parsedShopName,
+      contactName: profile.name || parsedShopName,
+      referenceId: `shop_${decoded.uid}`,
+      address: parsedAddress,
+      city: parsedCity,
+      state: parsedState,
+      postalCode: parsedPostalCode,
+      description: String(description || "").trim() || "Local print and copy shop",
+    });
+
     const shop = await createShop({
       ownerId: decoded.uid,
-      shopName: String(shopName).trim(),
-      address: String(address).trim(),
+      shopName: parsedShopName,
+      address: parsedAddress,
+      city: parsedCity,
+      state: parsedState,
+      postalCode: parsedPostalCode,
       googleMapsUrl: parseGoogleMapsUrl(googleMapsUrl),
-      phone: String(phone).trim(),
+      phone: parsedPhone,
       description: String(description || "").trim(),
       services: parseServices(services),
+      razorpayLinkedAccountId: parseRazorpayLinkedAccountId(linkedAccount.id),
+      razorpayLinkedAccountStatus: linkedAccount.status,
+      bankAccountHolderName: parsedBankAccountHolderName,
+      bankIfsc: parsedBankIfsc,
+      bankAccountLast4: maskBankAccount(parsedBankAccountNumber),
       pricing: shopPricing,
     });
 
@@ -109,7 +126,7 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const { decoded } = await requireApiRole("shop_owner");
+    const { decoded, profile } = await requireApiRole("shop_owner");
     const existingShop = await getShopByOwnerId(decoded.uid);
 
     if (!existingShop) {
@@ -119,22 +136,78 @@ export async function PATCH(request: Request) {
     const {
       shopName,
       address,
+      city,
+      state,
+      postalCode,
       googleMapsUrl,
       phone,
       description,
       services,
+      bankAccountHolderName,
+      bankIfsc,
+      bankAccountNumber,
       pricing,
     } = await request.json();
+
+    const parsedShopName = String(shopName || "").trim();
+    const parsedAddress = String(address || "").trim();
+    const parsedCity = parseRequiredText(city, "City");
+    const parsedState = parseRequiredText(state, "State");
+    const parsedPostalCode = parsePostalCode(postalCode);
+    const parsedPhone = parsePhone(phone);
+
+    let razorpayLinkedAccountId = String(existingShop.razorpayLinkedAccountId || "").trim();
+    let razorpayLinkedAccountStatus = String(existingShop.razorpayLinkedAccountStatus || "created").trim();
+    let parsedBankAccountHolderName = String(existingShop.bankAccountHolderName || "").trim();
+    let parsedBankIfsc = String(existingShop.bankIfsc || "").trim();
+    let parsedBankAccountLast4 = String(existingShop.bankAccountLast4 || "").trim();
+
+    if (!razorpayLinkedAccountId) {
+      if (!profile.email) {
+        throw new Error("Your profile email is required before creating a Razorpay linked account.");
+      }
+
+      parsedBankAccountHolderName = parseRequiredText(
+        bankAccountHolderName,
+        "Bank account holder name",
+      );
+      parsedBankIfsc = parseIfsc(bankIfsc);
+      parsedBankAccountLast4 = maskBankAccount(parseBankAccountNumber(bankAccountNumber));
+
+      const linkedAccount = await createRazorpayLinkedAccount({
+        email: profile.email,
+        phone: parsedPhone,
+        legalBusinessName: parsedShopName,
+        contactName: profile.name || parsedShopName,
+        referenceId: `shop_${decoded.uid}`,
+        address: parsedAddress,
+        city: parsedCity,
+        state: parsedState,
+        postalCode: parsedPostalCode,
+        description: String(description || "").trim() || "Local print and copy shop",
+      });
+
+      razorpayLinkedAccountId = parseRazorpayLinkedAccountId(linkedAccount.id);
+      razorpayLinkedAccountStatus = linkedAccount.status;
+    }
 
     const shop = await updateShop({
       shopId: existingShop.id,
       ownerId: decoded.uid,
-      shopName: String(shopName || "").trim(),
-      address: String(address || "").trim(),
+      shopName: parsedShopName,
+      address: parsedAddress,
+      city: parsedCity,
+      state: parsedState,
+      postalCode: parsedPostalCode,
       googleMapsUrl: parseGoogleMapsUrl(googleMapsUrl),
-      phone: String(phone || "").trim(),
+      phone: parsedPhone,
       description: String(description || "").trim(),
       services: parseServices(services),
+      razorpayLinkedAccountId,
+      razorpayLinkedAccountStatus,
+      bankAccountHolderName: parsedBankAccountHolderName,
+      bankIfsc: parsedBankIfsc,
+      bankAccountLast4: parsedBankAccountLast4,
       pricing: {
         blackWhiteSingle: parsePrice(pricing?.blackWhiteSingle),
         blackWhiteDouble: parsePrice(pricing?.blackWhiteDouble),

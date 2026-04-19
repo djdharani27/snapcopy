@@ -16,7 +16,7 @@ export default async function ShopOwnerSetupPage() {
       title={existingShop ? "Shop settings" : "Set up your shop"}
       description="Create or manage the single shop profile used by this MVP. Customers will see your Google Maps location, services, and price list before placing orders."
     >
-      <ShopSetupForm shop={existingShop} />
+      <ShopSetupForm shop={existingShop} profile={profile} />
     </DashboardShell>
   );
 }

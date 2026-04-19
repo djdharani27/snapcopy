@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { LogoutButton } from "@/components/auth/logout-button";
-import type { UserProfile } from "@/types";
 
 interface DashboardShellProps {
-  profile: UserProfile;
+  profile: {
+    name: string;
+    email: string;
+  };
   title: string;
   description: string;
   children: React.ReactNode;

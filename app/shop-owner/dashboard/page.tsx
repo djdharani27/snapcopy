@@ -26,7 +26,7 @@ export default async function ShopOwnerDashboardPage() {
     <DashboardShell
       profile={profile}
       title={`${shop.shopName} orders`}
-      description="Incoming print requests for your shop. Download files and update order status as work progresses."
+      description="Incoming print requests for your shop. Paid orders move through payment verification and a separate Razorpay Route transfer."
       actions={
         <>
           <ShopOwnerNav active="orders" />

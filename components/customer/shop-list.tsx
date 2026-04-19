@@ -94,7 +94,7 @@ export function ShopList({
                 href={`/customer/shop/${shop.id}`}
                 className="btn-primary mt-6 w-full"
               >
-                Send documents
+                View shop
               </Link>
             </article>
           ))}
