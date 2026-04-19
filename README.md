@@ -14,7 +14,8 @@ Lean Xerox / print-shop marketplace MVP built with Next.js App Router, Firebase 
 
 ## What this MVP includes
 
-- Customer sign-in with Google
+- Customer sign-in with Google or email/password
+- Seeded customer test account: `testuser@demo.com` / `Test@1234`
 - First-login role selection: `customer` or `shop_owner`
 - Shop owner can create exactly one shop
 - Customer dashboard with shop search
@@ -73,7 +74,7 @@ Use a Firebase service account from your project settings. Keep the private key 
 ## Local setup
 
 1. Create a Firebase project.
-2. Enable Google sign-in in Firebase Authentication.
+2. Enable Google sign-in and Email/Password sign-in in Firebase Authentication.
 3. Create a Firestore database.
 4. Create an AWS S3 bucket.
 5. Copy `.env.local.example` to `.env.local`.

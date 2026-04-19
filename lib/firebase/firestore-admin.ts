@@ -89,6 +89,7 @@ export async function upsertUserProfile(params: {
   name: string;
   email: string;
   role: UserRole;
+  isTestAccount?: boolean;
   phone?: string;
 }) {
   const ref = adminDb().collection("users").doc(params.uid);
@@ -100,6 +101,9 @@ export async function upsertUserProfile(params: {
       name: params.name,
       email: params.email,
       role: params.role,
+      ...(params.isTestAccount !== undefined
+        ? { isTestAccount: params.isTestAccount }
+        : {}),
       ...(params.phone ? { phone: params.phone } : {}),
       createdAt: snapshot.exists ? snapshot.data()?.createdAt : FieldValue.serverTimestamp(),
     },

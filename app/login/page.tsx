@@ -1,12 +1,20 @@
 import { redirect } from "next/navigation";
 import { LoginCard } from "@/components/auth/login-card";
 import { getCurrentUserProfile, getCurrentToken } from "@/lib/auth/session";
+import { ensureSeededTestUser } from "@/lib/auth/test-user";
+import { hasFirebaseAdminEnv } from "@/lib/firebase/admin";
 
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ next?: string }>;
 }) {
+  const testAccountReady = hasFirebaseAdminEnv();
+
+  if (testAccountReady) {
+    await ensureSeededTestUser();
+  }
+
   const token = await getCurrentToken();
   const profile = await getCurrentUserProfile();
   const { next } = await searchParams;
@@ -26,7 +34,7 @@ export default async function LoginPage({
 
   return (
     <div className="page-shell flex min-h-screen items-center justify-center px-4 py-10">
-      <LoginCard />
+      <LoginCard nextPath={nextPath} />
     </div>
   );
 }

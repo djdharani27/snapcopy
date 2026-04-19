@@ -6,6 +6,16 @@ function getPrivateKey() {
   return process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
 }
 
+export function hasFirebaseAdminEnv() {
+  const required = {
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: getPrivateKey(),
+  };
+
+  return Object.values(required).every(Boolean);
+}
+
 function assertAdminEnv() {
   const required = {
     projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,

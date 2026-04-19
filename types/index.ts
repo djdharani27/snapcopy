@@ -12,6 +12,7 @@ export interface UserProfile {
   name: string;
   email: string;
   role: UserRole;
+  isTestAccount?: boolean;
   phone?: string;
   createdAt?: string | null;
 }
