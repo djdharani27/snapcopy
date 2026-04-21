@@ -77,6 +77,8 @@ Use a Firebase service account from your project settings. Keep the private key 
 
 Each shop owner needs a Razorpay Route Linked Account. The app creates one during shop setup using the shop details entered in the onboarding form. Platform billing values are stored in Firestore under `platform_settings/billing`, and these env vars only act as fallbacks.
 
+For live cutover, point `NEXT_PUBLIC_RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` at your live credentials, and set `RAZORPAY_WEBHOOK_SECRET` to the webhook secret from the same live Razorpay account. If you keep both test and live credentials in `.env.local`, Next.js supports `$VARIABLE` expansion so the active values can reference the live ones.
+
 ## Local setup
 
 1. Create a Firebase project.
@@ -112,6 +114,9 @@ Each shop owner needs a Razorpay Route Linked Account. The app creates one durin
 - `description`: string
 - `razorpayLinkedAccountId`: string
 - `razorpayLinkedAccountStatus`: string
+- `razorpayStakeholderId`: string
+- `razorpayProductId`: string
+- `razorpayProductStatus`: string
 - `bankAccountHolderName`: string
 - `bankIfsc`: string
 - `bankAccountLast4`: string
@@ -197,7 +202,7 @@ Deploy [firestore.indexes.json](/C:/Users/gearz/OneDrive/Documents/New----CODE/A
 - If Firebase Admin is missing, protected routes and API uploads will fail by design.
 - Razorpay Route must be enabled on your Razorpay account.
 - Each linked account has a 24-hour cooling period before transfers can be initiated.
-- Shop setup creates the linked account automatically from the submitted shop profile. The current integration defaults the linked-account business type to `proprietorship`.
+- Shop setup now creates the linked account, creates a Route stakeholder, requests the Route product, and updates the settlement configuration with the submitted bank account details. The current integration defaults the linked-account business type to `proprietorship`.
 - Customer checkout creates a normal Razorpay order with the full amount.
 - After payment verification, the server reads `platform_settings/billing` and calculates the flat transaction fee, estimated processing fee, GST, and transferable amount.
 - The server then creates a separate Razorpay Route transfer from the captured payment to the shop owner's linked account.

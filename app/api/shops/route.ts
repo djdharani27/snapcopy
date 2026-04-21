@@ -6,12 +6,19 @@ import {
   getShopByOwnerId,
   updateShop,
 } from "@/lib/firebase/firestore-admin";
-import { createRazorpayLinkedAccount } from "@/lib/payments/razorpay";
 import {
+  createRazorpayLinkedAccount,
+  createRazorpayStakeholder,
+  requestRazorpayRouteProductConfiguration,
+  updateRazorpayRouteProductConfiguration,
+} from "@/lib/payments/razorpay";
+import {
+  parseAcceptedTerms,
   maskBankAccount,
   parseBankAccountNumber,
   parseGoogleMapsUrl,
   parseIfsc,
+  parsePan,
   parsePhone,
   parsePrice,
   parsePostalCode,
@@ -19,6 +26,22 @@ import {
   parseRazorpayLinkedAccountId,
   parseServices,
 } from "@/lib/shops/validation";
+
+function canAttemptRouteOnboarding(params: {
+  bankAccountHolderName?: unknown;
+  bankIfsc?: unknown;
+  bankAccountNumber?: unknown;
+  ownerPan?: unknown;
+  acceptRouteTerms?: unknown;
+}) {
+  return (
+    String(params.bankAccountHolderName || "").trim() &&
+    String(params.bankIfsc || "").trim() &&
+    String(params.bankAccountNumber || "").trim() &&
+    String(params.ownerPan || "").trim() &&
+    Boolean(params.acceptRouteTerms)
+  );
+}
 
 export async function GET() {
   try {
@@ -49,6 +72,8 @@ export async function POST(request: Request) {
       bankAccountHolderName,
       bankIfsc,
       bankAccountNumber,
+      ownerPan,
+      acceptRouteTerms,
       pricing,
     } = await request.json();
 
@@ -76,25 +101,89 @@ export async function POST(request: Request) {
     const parsedState = parseRequiredText(state, "State");
     const parsedPostalCode = parsePostalCode(postalCode);
     const parsedPhone = parsePhone(phone);
-    const parsedBankAccountHolderName = parseRequiredText(
-      bankAccountHolderName,
-      "Bank account holder name",
-    );
-    const parsedBankIfsc = parseIfsc(bankIfsc);
-    const parsedBankAccountNumber = parseBankAccountNumber(bankAccountNumber);
+    let parsedBankAccountHolderName = String(bankAccountHolderName || "").trim();
+    let parsedBankIfsc = String(bankIfsc || "").trim().toUpperCase();
+    let parsedBankAccountLast4 = "";
+    let razorpayLinkedAccountId = "";
+    let razorpayLinkedAccountStatus = "";
+    let razorpayStakeholderId = "";
+    let razorpayProductId = "";
+    let razorpayProductStatus = "";
+    let warning = "";
 
-    const linkedAccount = await createRazorpayLinkedAccount({
-      email: profile.email,
-      phone: parsedPhone,
-      legalBusinessName: parsedShopName,
-      contactName: profile.name || parsedShopName,
-      referenceId: `shop_${decoded.uid}`,
-      address: parsedAddress,
-      city: parsedCity,
-      state: parsedState,
-      postalCode: parsedPostalCode,
-      description: String(description || "").trim() || "Local print and copy shop",
-    });
+    if (canAttemptRouteOnboarding({
+      bankAccountHolderName,
+      bankIfsc,
+      bankAccountNumber,
+      ownerPan,
+      acceptRouteTerms,
+    })) {
+      try {
+        parsedBankAccountHolderName = parseRequiredText(
+          bankAccountHolderName,
+          "Bank account holder name",
+        );
+        parsedBankIfsc = parseIfsc(bankIfsc);
+        const parsedBankAccountNumber = parseBankAccountNumber(bankAccountNumber);
+        const parsedOwnerPan = parsePan(ownerPan);
+        const acceptedRouteTerms = parseAcceptedTerms(
+          acceptRouteTerms,
+          "Accept the Razorpay Route terms before creating the shop.",
+        );
+        parsedBankAccountLast4 = maskBankAccount(parsedBankAccountNumber);
+
+        const linkedAccount = await createRazorpayLinkedAccount({
+          email: profile.email,
+          phone: parsedPhone,
+          legalBusinessName: parsedShopName,
+          contactName: profile.name || parsedShopName,
+          referenceId: `shop_${decoded.uid}`,
+          address: parsedAddress,
+          city: parsedCity,
+          state: parsedState,
+          postalCode: parsedPostalCode,
+          description: String(description || "").trim() || "Local print and copy shop",
+        });
+
+        razorpayLinkedAccountId = parseRazorpayLinkedAccountId(linkedAccount.id);
+        razorpayLinkedAccountStatus = linkedAccount.status;
+
+        const stakeholder = await createRazorpayStakeholder({
+          accountId: razorpayLinkedAccountId,
+          name: parsedBankAccountHolderName,
+          email: profile.email,
+          phone: parsedPhone,
+          pan: parsedOwnerPan,
+          address: parsedAddress,
+          city: parsedCity,
+          state: parsedState,
+          postalCode: parsedPostalCode,
+        });
+        razorpayStakeholderId = stakeholder.id;
+
+        const routeProduct = await requestRazorpayRouteProductConfiguration({
+          accountId: razorpayLinkedAccountId,
+          tncAccepted: acceptedRouteTerms,
+        });
+
+        const updatedRouteProduct = await updateRazorpayRouteProductConfiguration({
+          accountId: razorpayLinkedAccountId,
+          productId: routeProduct.id,
+          accountNumber: parsedBankAccountNumber,
+          ifscCode: parsedBankIfsc,
+          beneficiaryName: parsedBankAccountHolderName,
+          tncAccepted: acceptedRouteTerms,
+        });
+
+        razorpayProductId = updatedRouteProduct.id;
+        razorpayProductStatus = updatedRouteProduct.activation_status;
+      } catch (routeError) {
+        warning =
+          routeError instanceof Error
+            ? `Shop created, but Razorpay payouts are not enabled yet: ${routeError.message}`
+            : "Shop created, but Razorpay payouts are not enabled yet.";
+      }
+    }
 
     const shop = await createShop({
       ownerId: decoded.uid,
@@ -107,15 +196,18 @@ export async function POST(request: Request) {
       phone: parsedPhone,
       description: String(description || "").trim(),
       services: parseServices(services),
-      razorpayLinkedAccountId: parseRazorpayLinkedAccountId(linkedAccount.id),
-      razorpayLinkedAccountStatus: linkedAccount.status,
+      razorpayLinkedAccountId,
+      razorpayLinkedAccountStatus,
+      razorpayStakeholderId,
+      razorpayProductId,
+      razorpayProductStatus,
       bankAccountHolderName: parsedBankAccountHolderName,
       bankIfsc: parsedBankIfsc,
-      bankAccountLast4: maskBankAccount(parsedBankAccountNumber),
+      bankAccountLast4: parsedBankAccountLast4,
       pricing: shopPricing,
     });
 
-    return NextResponse.json({ shop });
+    return NextResponse.json({ shop, warning });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unauthorized." },
@@ -146,6 +238,8 @@ export async function PATCH(request: Request) {
       bankAccountHolderName,
       bankIfsc,
       bankAccountNumber,
+      ownerPan,
+      acceptRouteTerms,
       pricing,
     } = await request.json();
 
@@ -158,37 +252,105 @@ export async function PATCH(request: Request) {
 
     let razorpayLinkedAccountId = String(existingShop.razorpayLinkedAccountId || "").trim();
     let razorpayLinkedAccountStatus = String(existingShop.razorpayLinkedAccountStatus || "created").trim();
+    let razorpayStakeholderId = String(existingShop.razorpayStakeholderId || "").trim();
+    let razorpayProductId = String(existingShop.razorpayProductId || "").trim();
+    let razorpayProductStatus = String(existingShop.razorpayProductStatus || "").trim();
     let parsedBankAccountHolderName = String(existingShop.bankAccountHolderName || "").trim();
     let parsedBankIfsc = String(existingShop.bankIfsc || "").trim();
     let parsedBankAccountLast4 = String(existingShop.bankAccountLast4 || "").trim();
+    let warning = "";
 
-    if (!razorpayLinkedAccountId) {
+    if (
+      canAttemptRouteOnboarding({
+        bankAccountHolderName,
+        bankIfsc,
+        bankAccountNumber,
+        ownerPan,
+        acceptRouteTerms,
+      })
+    ) {
       if (!profile.email) {
         throw new Error("Your profile email is required before creating a Razorpay linked account.");
       }
 
-      parsedBankAccountHolderName = parseRequiredText(
-        bankAccountHolderName,
-        "Bank account holder name",
-      );
-      parsedBankIfsc = parseIfsc(bankIfsc);
-      parsedBankAccountLast4 = maskBankAccount(parseBankAccountNumber(bankAccountNumber));
+      try {
+        parsedBankAccountHolderName = parseRequiredText(
+          bankAccountHolderName,
+          "Bank account holder name",
+        );
+        parsedBankIfsc = parseIfsc(bankIfsc);
+        const parsedBankAccountNumber = parseBankAccountNumber(bankAccountNumber);
+        const parsedOwnerPan = parsePan(ownerPan);
+        const acceptedRouteTerms = parseAcceptedTerms(
+          acceptRouteTerms,
+          "Accept the Razorpay Route terms before creating the shop.",
+        );
+        parsedBankAccountLast4 = maskBankAccount(parsedBankAccountNumber);
 
-      const linkedAccount = await createRazorpayLinkedAccount({
-        email: profile.email,
-        phone: parsedPhone,
-        legalBusinessName: parsedShopName,
-        contactName: profile.name || parsedShopName,
-        referenceId: `shop_${decoded.uid}`,
-        address: parsedAddress,
-        city: parsedCity,
-        state: parsedState,
-        postalCode: parsedPostalCode,
-        description: String(description || "").trim() || "Local print and copy shop",
-      });
+        const needsStakeholder = !razorpayStakeholderId;
+        const needsRouteProduct = !razorpayProductId;
 
-      razorpayLinkedAccountId = parseRazorpayLinkedAccountId(linkedAccount.id);
-      razorpayLinkedAccountStatus = linkedAccount.status;
+        if (!razorpayLinkedAccountId) {
+          const linkedAccount = await createRazorpayLinkedAccount({
+            email: profile.email,
+            phone: parsedPhone,
+            legalBusinessName: parsedShopName,
+            contactName: profile.name || parsedShopName,
+            referenceId: `shop_${decoded.uid}`,
+            address: parsedAddress,
+            city: parsedCity,
+            state: parsedState,
+            postalCode: parsedPostalCode,
+            description: String(description || "").trim() || "Local print and copy shop",
+          });
+
+          razorpayLinkedAccountId = parseRazorpayLinkedAccountId(linkedAccount.id);
+          razorpayLinkedAccountStatus = linkedAccount.status;
+        }
+
+        if (needsStakeholder) {
+          const stakeholder = await createRazorpayStakeholder({
+            accountId: razorpayLinkedAccountId,
+            name: parsedBankAccountHolderName,
+            email: profile.email,
+            phone: parsedPhone,
+            pan: parsedOwnerPan,
+            address: parsedAddress,
+            city: parsedCity,
+            state: parsedState,
+            postalCode: parsedPostalCode,
+          });
+
+          razorpayStakeholderId = stakeholder.id;
+        }
+
+        if (needsRouteProduct) {
+          const routeProduct = await requestRazorpayRouteProductConfiguration({
+            accountId: razorpayLinkedAccountId,
+            tncAccepted: acceptedRouteTerms,
+          });
+
+          razorpayProductId = routeProduct.id;
+          razorpayProductStatus = routeProduct.activation_status;
+        }
+
+        const updatedRouteProduct = await updateRazorpayRouteProductConfiguration({
+          accountId: razorpayLinkedAccountId,
+          productId: razorpayProductId,
+          accountNumber: parsedBankAccountNumber,
+          ifscCode: parsedBankIfsc,
+          beneficiaryName: parsedBankAccountHolderName,
+          tncAccepted: acceptedRouteTerms,
+        });
+
+        razorpayProductId = updatedRouteProduct.id;
+        razorpayProductStatus = updatedRouteProduct.activation_status;
+      } catch (routeError) {
+        warning =
+          routeError instanceof Error
+            ? `Shop saved, but Razorpay payouts are not enabled yet: ${routeError.message}`
+            : "Shop saved, but Razorpay payouts are not enabled yet.";
+      }
     }
 
     const shop = await updateShop({
@@ -205,6 +367,9 @@ export async function PATCH(request: Request) {
       services: parseServices(services),
       razorpayLinkedAccountId,
       razorpayLinkedAccountStatus,
+      razorpayStakeholderId,
+      razorpayProductId,
+      razorpayProductStatus,
       bankAccountHolderName: parsedBankAccountHolderName,
       bankIfsc: parsedBankIfsc,
       bankAccountLast4: parsedBankAccountLast4,
@@ -216,7 +381,7 @@ export async function PATCH(request: Request) {
       },
     });
 
-    return NextResponse.json({ shop });
+    return NextResponse.json({ shop, warning });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to update shop." },

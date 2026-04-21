@@ -106,7 +106,15 @@ export function OrdersTable({
     setUpdatingOrderId(orderId);
 
     try {
-      const finalAmount = Number(completionAmounts[orderId]);
+      const amountInput = document.getElementById(`amount-${orderId}`) as HTMLInputElement | null;
+      const rawFinalAmount = amountInput?.value ?? completionAmounts[orderId] ?? "";
+      const finalAmount = Number(rawFinalAmount);
+
+      setCompletionAmounts((current) => ({
+        ...current,
+        [orderId]: rawFinalAmount,
+      }));
+
       if (status === "completed" && (Number.isNaN(finalAmount) || finalAmount < 0)) {
         throw new Error("Enter a valid final amount before completing the order.");
       }

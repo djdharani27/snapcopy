@@ -57,6 +57,9 @@ export interface Shop {
   services: string[];
   razorpayLinkedAccountId?: string;
   razorpayLinkedAccountStatus?: string;
+  razorpayStakeholderId?: string;
+  razorpayProductId?: string;
+  razorpayProductStatus?: string;
   bankAccountHolderName?: string;
   bankIfsc?: string;
   bankAccountLast4?: string;

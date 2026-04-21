@@ -212,6 +212,187 @@ export async function createRazorpayLinkedAccount(params: {
   }>(response, "Unable to create Razorpay linked account.");
 }
 
+export async function fetchRazorpayLinkedAccount(accountId: string) {
+  const response = await fetch(`https://api.razorpay.com/v2/accounts/${accountId}`, {
+    headers: {
+      Authorization: getRazorpayBasicAuthHeader(),
+      "Content-Type": "application/json",
+    },
+  });
+
+  return parseRazorpayResponse<{
+    id: string;
+    type: "route";
+    status: string;
+    email: string;
+    phone: string | number;
+    reference_id?: string;
+  }>(response, "Unable to fetch Razorpay linked account.");
+}
+
+export async function createRazorpayStakeholder(params: {
+  accountId: string;
+  name: string;
+  email: string;
+  phone: string;
+  pan: string;
+  address: string;
+  city: string;
+  state: string;
+  postalCode: string;
+}) {
+  const response = await fetch(
+    `https://api.razorpay.com/v2/accounts/${params.accountId}/stakeholders`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: getRazorpayBasicAuthHeader(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: params.name,
+        email: params.email,
+        relationship: {
+          director: true,
+          executive: true,
+        },
+        percentage_ownership: 100,
+        phone: {
+          primary: Number(params.phone),
+        },
+        addresses: {
+          residential: {
+            street: params.address,
+            city: params.city,
+            state: params.state.toUpperCase(),
+            postal_code: params.postalCode,
+            country: "IN",
+          },
+        },
+        kyc: {
+          pan: params.pan,
+        },
+      }),
+    },
+  );
+
+  return parseRazorpayResponse<{
+    id: string;
+    entity: "stakeholder";
+    name: string;
+    email: string;
+    kyc?: {
+      pan?: string;
+    };
+  }>(response, "Unable to create Razorpay stakeholder.");
+}
+
+export async function requestRazorpayRouteProductConfiguration(params: {
+  accountId: string;
+  tncAccepted: boolean;
+}) {
+  const response = await fetch(`https://api.razorpay.com/v2/accounts/${params.accountId}/products`, {
+    method: "POST",
+    headers: {
+      Authorization: getRazorpayBasicAuthHeader(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      product_name: "route",
+      tnc_accepted: params.tncAccepted,
+    }),
+  });
+
+  return parseRazorpayResponse<{
+    id: string;
+    product_name: "route" | "Route";
+    activation_status: string;
+  }>(response, "Unable to request Razorpay Route product configuration.");
+}
+
+export async function updateRazorpayRouteProductConfiguration(params: {
+  accountId: string;
+  productId: string;
+  accountNumber: string;
+  ifscCode: string;
+  beneficiaryName: string;
+  tncAccepted: boolean;
+}) {
+  const response = await fetch(
+    `https://api.razorpay.com/v2/accounts/${params.accountId}/products/${params.productId}`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: getRazorpayBasicAuthHeader(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        settlements: {
+          account_number: params.accountNumber,
+          ifsc_code: params.ifscCode,
+          beneficiary_name: params.beneficiaryName,
+        },
+        tnc_accepted: params.tncAccepted,
+      }),
+    },
+  );
+
+  return parseRazorpayResponse<{
+    requested_configuration?: unknown;
+    active_configuration?: {
+      settlements?: {
+        account_number?: string;
+        ifsc_code?: string;
+        beneficiary_name?: string;
+      };
+    };
+    requirements?: Array<{
+      field_reference?: string;
+      resolution_url?: string;
+      reason_code?: string;
+      status?: string;
+    }>;
+    tnc?: {
+      accepted?: boolean;
+      accepted_at?: number;
+    };
+    id: string;
+    product_name: "route" | "Route";
+    activation_status: string;
+    account_id: string;
+  }>(response, "Unable to update Razorpay Route settlement configuration.");
+}
+
+export async function fetchRazorpayRouteProductConfiguration(params: {
+  accountId: string;
+  productId: string;
+}) {
+  const response = await fetch(
+    `https://api.razorpay.com/v2/accounts/${params.accountId}/products/${params.productId}`,
+    {
+      headers: {
+        Authorization: getRazorpayBasicAuthHeader(),
+        "Content-Type": "application/json",
+      },
+    },
+  );
+
+  return parseRazorpayResponse<{
+    requested_configuration?: unknown;
+    active_configuration?: unknown;
+    requirements?: Array<{
+      field_reference?: string;
+      resolution_url?: string;
+      reason_code?: string;
+      status?: string;
+    }>;
+    id: string;
+    product_name: "route" | "Route";
+    activation_status: string;
+    account_id: string;
+  }>(response, "Unable to fetch Razorpay Route product configuration.");
+}
+
 export function verifyRazorpaySignature(params: {
   razorpayOrderId: string;
   razorpayPaymentId: string;

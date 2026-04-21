@@ -93,6 +93,26 @@ export function parseIfsc(value: unknown) {
   return trimmedValue;
 }
 
+export function parsePan(value: unknown) {
+  const trimmedValue = String(value || "").trim().toUpperCase();
+
+  if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(trimmedValue)) {
+    throw new Error("Enter a valid PAN.");
+  }
+
+  return trimmedValue;
+}
+
+export function parseAcceptedTerms(value: unknown, label: string) {
+  const normalizedValue = String(value || "").trim().toLowerCase();
+
+  if (!["true", "on", "yes", "1"].includes(normalizedValue)) {
+    throw new Error(label);
+  }
+
+  return true;
+}
+
 export function parseBankAccountNumber(value: unknown) {
   const trimmedValue = String(value || "").replace(/\s/g, "");
 

@@ -60,6 +60,9 @@ function normalizeShop(shop: Shop): Shop {
     services: Array.isArray(shop.services) ? shop.services : [],
     razorpayLinkedAccountId: String(shop.razorpayLinkedAccountId || "").trim(),
     razorpayLinkedAccountStatus: String(shop.razorpayLinkedAccountStatus || "").trim(),
+    razorpayStakeholderId: String(shop.razorpayStakeholderId || "").trim(),
+    razorpayProductId: String(shop.razorpayProductId || "").trim(),
+    razorpayProductStatus: String(shop.razorpayProductStatus || "").trim(),
     bankAccountHolderName: String(shop.bankAccountHolderName || "").trim(),
     bankIfsc: String(shop.bankIfsc || "").trim(),
     bankAccountLast4: String(shop.bankAccountLast4 || "").trim(),
@@ -203,6 +206,9 @@ export async function createShop(params: {
   services: string[];
   razorpayLinkedAccountId: string;
   razorpayLinkedAccountStatus?: string;
+  razorpayStakeholderId?: string;
+  razorpayProductId?: string;
+  razorpayProductStatus?: string;
   bankAccountHolderName?: string;
   bankIfsc?: string;
   bankAccountLast4?: string;
@@ -228,6 +234,9 @@ export async function createShop(params: {
     services: params.services,
     razorpayLinkedAccountId: params.razorpayLinkedAccountId,
     razorpayLinkedAccountStatus: params.razorpayLinkedAccountStatus || "created",
+    razorpayStakeholderId: params.razorpayStakeholderId || "",
+    razorpayProductId: params.razorpayProductId || "",
+    razorpayProductStatus: params.razorpayProductStatus || "",
     bankAccountHolderName: params.bankAccountHolderName || "",
     bankIfsc: params.bankIfsc || "",
     bankAccountLast4: params.bankAccountLast4 || "",
@@ -252,6 +261,9 @@ export async function updateShop(params: {
   services: string[];
   razorpayLinkedAccountId: string;
   razorpayLinkedAccountStatus?: string;
+  razorpayStakeholderId?: string;
+  razorpayProductId?: string;
+  razorpayProductStatus?: string;
   bankAccountHolderName?: string;
   bankIfsc?: string;
   bankAccountLast4?: string;
@@ -275,10 +287,33 @@ export async function updateShop(params: {
       services: params.services,
       razorpayLinkedAccountId: params.razorpayLinkedAccountId,
       razorpayLinkedAccountStatus: params.razorpayLinkedAccountStatus || "created",
+      razorpayStakeholderId: params.razorpayStakeholderId || "",
+      razorpayProductId: params.razorpayProductId || "",
+      razorpayProductStatus: params.razorpayProductStatus || "",
       bankAccountHolderName: params.bankAccountHolderName || "",
       bankIfsc: params.bankIfsc || "",
       bankAccountLast4: params.bankAccountLast4 || "",
       pricing: params.pricing,
+    },
+    { merge: true },
+  );
+
+  return getShopById(params.shopId);
+}
+
+export async function updateShopRazorpayStatus(params: {
+  shopId: string;
+  razorpayLinkedAccountStatus?: string;
+  razorpayProductStatus?: string;
+}) {
+  await adminDb().collection("shops").doc(params.shopId).set(
+    {
+      ...(params.razorpayLinkedAccountStatus !== undefined
+        ? { razorpayLinkedAccountStatus: params.razorpayLinkedAccountStatus }
+        : {}),
+      ...(params.razorpayProductStatus !== undefined
+        ? { razorpayProductStatus: params.razorpayProductStatus }
+        : {}),
     },
     { merge: true },
   );

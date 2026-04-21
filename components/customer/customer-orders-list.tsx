@@ -1,16 +1,16 @@
 import Link from "next/link";
 import { PayOrderButton } from "@/components/customer/pay-order-button";
 import {
+  canShopReceiveOnlinePayments,
+  getShopPaymentUnavailableMessage,
+} from "@/lib/payments/shop-readiness";
+import {
   customerStatusLabel,
   formatCurrency,
   formatDate,
   formatTrackingId,
   statusClassName,
 } from "@/lib/utils/format";
-import {
-  canShopReceiveOnlinePayments,
-  getShopPaymentUnavailableMessage,
-} from "@/lib/payments/shop-readiness";
 import type { OrderWithFiles, Shop, UserProfile } from "@/types";
 
 export function CustomerOrdersList({
@@ -34,12 +34,13 @@ export function CustomerOrdersList({
     <div className="space-y-4">
       {orders.map((order) => {
         const shop = shopsById[order.shopId];
-        const canReceiveOnlinePayments = canShopReceiveOnlinePayments(shop);
+        const canAcceptOnlinePayment = canShopReceiveOnlinePayments(shop);
         const shouldShowPaymentAction =
           order.status === "completed" &&
           order.finalAmount !== null &&
           order.finalAmount !== undefined &&
-          order.paymentStatus !== "paid";
+          order.paymentStatus !== "paid" &&
+          canAcceptOnlinePayment;
 
         return (
           <article key={order.id} className="panel p-5">
@@ -108,7 +109,7 @@ export function CustomerOrdersList({
                 ) : (
                   <p className="text-sm text-slate-500">Awaiting final amount</p>
                 )}
-                {shouldShowPaymentAction && canReceiveOnlinePayments ? (
+                {shouldShowPaymentAction ? (
                   <PayOrderButton
                     orderId={order.id}
                     amount={Number(order.finalAmount)}
@@ -117,9 +118,13 @@ export function CustomerOrdersList({
                     phone={profile.phone}
                   />
                 ) : null}
-                {shouldShowPaymentAction && !canReceiveOnlinePayments ? (
-                  <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                    {getShopPaymentUnavailableMessage()} Contact the shop to complete the payment offline.
+                {!canAcceptOnlinePayment &&
+                order.status === "completed" &&
+                order.finalAmount !== null &&
+                order.finalAmount !== undefined &&
+                order.paymentStatus !== "paid" ? (
+                  <div className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+                    {getShopPaymentUnavailableMessage()}
                   </div>
                 ) : null}
                 {order.paymentStatus === "paid" ? (

@@ -13,6 +13,7 @@ export function ShopQrToggle({ children }: { children: React.ReactNode }) {
         className="btn-secondary"
         aria-expanded={isOpen}
         aria-controls="shop-owner-qr-panel"
+        suppressHydrationWarning
       >
         <svg
           aria-hidden="true"

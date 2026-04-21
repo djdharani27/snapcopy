@@ -13,13 +13,22 @@ export function ShopSetupForm({
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [syncingStatus, setSyncingStatus] = useState(false);
   const [error, setError] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
   const hasLinkedAccount = Boolean(shop?.razorpayLinkedAccountId);
+  const needsRouteOnboarding =
+    !shop?.razorpayLinkedAccountId ||
+    !shop?.razorpayStakeholderId ||
+    !shop?.razorpayProductId ||
+    !shop?.razorpayProductStatus ||
+    shop?.razorpayProductStatus !== "activated";
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setError("");
+    setStatusMessage("");
 
     const formData = new FormData(event.currentTarget);
 
@@ -40,6 +49,8 @@ export function ShopSetupForm({
           bankAccountHolderName: formData.get("bankAccountHolderName"),
           bankIfsc: formData.get("bankIfsc"),
           bankAccountNumber: formData.get("bankAccountNumber"),
+          ownerPan: formData.get("ownerPan"),
+          acceptRouteTerms: formData.get("acceptRouteTerms"),
           pricing: {
             blackWhiteSingle: formData.get("blackWhiteSingle"),
             blackWhiteDouble: formData.get("blackWhiteDouble"),
@@ -54,6 +65,10 @@ export function ShopSetupForm({
         throw new Error(payload.error || "Unable to create shop.");
       }
 
+      if (payload.warning) {
+        setStatusMessage(payload.warning);
+      }
+
       router.replace("/shop-owner/dashboard");
       router.refresh();
     } catch (submissionError) {
@@ -64,6 +79,32 @@ export function ShopSetupForm({
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleSyncStatus() {
+    setSyncingStatus(true);
+    setError("");
+    setStatusMessage("");
+
+    try {
+      const response = await fetch("/api/shops/sync-status", {
+        method: "POST",
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Unable to sync Razorpay status.");
+      }
+
+      setStatusMessage("Razorpay status synced.");
+      router.refresh();
+    } catch (syncError) {
+      setError(
+        syncError instanceof Error ? syncError.message : "Unable to sync Razorpay status.",
+      );
+    } finally {
+      setSyncingStatus(false);
     }
   }
 
@@ -196,13 +237,16 @@ export function ShopSetupForm({
 
         <div className="md:col-span-2">
           <p className="label">Razorpay settlement</p>
-          {hasLinkedAccount ? (
+          {hasLinkedAccount && !needsRouteOnboarding ? (
             <div className="rounded-[24px] border border-[#eadfd3] bg-[rgba(255,248,241,0.82)] p-4 text-sm text-slate-600">
               <p className="font-semibold text-slate-900">
                 Linked account: {shop?.razorpayLinkedAccountId}
               </p>
               <p className="mt-2">
                 Status: {shop?.razorpayLinkedAccountStatus || "created"}
+              </p>
+              <p className="mt-2">
+                Route product: {shop?.razorpayProductStatus || "not_requested"}
               </p>
               <p className="mt-2">
                 Beneficiary: {shop?.bankAccountHolderName || "-"}
@@ -213,9 +257,36 @@ export function ShopSetupForm({
               <p className="mt-2 text-xs text-slate-500">
                 This shop already has a Razorpay linked account. After payment verification, the server creates the Route transfer to this account.
               </p>
+              <button
+                type="button"
+                onClick={() => void handleSyncStatus()}
+                disabled={syncingStatus}
+                className="btn-secondary mt-4"
+              >
+                {syncingStatus ? "Syncing..." : "Sync Razorpay status"}
+              </button>
             </div>
           ) : (
             <div className="grid gap-5 md:grid-cols-2">
+              {hasLinkedAccount ? (
+                <div className="md:col-span-2 rounded-[24px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  Linked account: {shop?.razorpayLinkedAccountId}
+                  <br />
+                  Route product status: {shop?.razorpayProductStatus || "not_requested"}
+                  <br />
+                  Complete the missing Route onboarding fields below so payouts can be activated.
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={() => void handleSyncStatus()}
+                      disabled={syncingStatus}
+                      className="btn-secondary"
+                    >
+                      {syncingStatus ? "Syncing..." : "Sync Razorpay status"}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               <div>
                 <label className="label" htmlFor="bankAccountHolderName">
                   Account holder name
@@ -225,7 +296,6 @@ export function ShopSetupForm({
                   name="bankAccountHolderName"
                   className="input"
                   defaultValue={shop?.bankAccountHolderName || profile.name || ""}
-                  required={!hasLinkedAccount}
                 />
               </div>
 
@@ -239,7 +309,6 @@ export function ShopSetupForm({
                   className="input"
                   defaultValue={shop?.bankIfsc || ""}
                   placeholder="HDFC0001234"
-                  required={!hasLinkedAccount}
                 />
               </div>
 
@@ -254,12 +323,38 @@ export function ShopSetupForm({
                   inputMode="numeric"
                   autoComplete="off"
                   placeholder="Enter the settlement bank account number"
-                  required={!hasLinkedAccount}
                 />
                 <p className="mt-2 text-xs text-slate-500">
-                  The full account number is used only during onboarding. Only the last 4 digits are stored in this app.
+                  Optional for now. Add it later when Razorpay Route is enabled. Only the last 4 digits are stored in this app.
                 </p>
               </div>
+
+              <div>
+                <label className="label" htmlFor="ownerPan">
+                  Owner PAN
+                </label>
+                <input
+                  id="ownerPan"
+                  name="ownerPan"
+                  className="input"
+                  placeholder="ABCDE1234F"
+                  autoCapitalize="characters"
+                />
+                <p className="mt-2 text-xs text-slate-500">
+                  Optional for now. Used later to complete Razorpay Route onboarding.
+                </p>
+              </div>
+
+              <label className="md:col-span-2 flex items-start gap-3 rounded-[22px] border border-[#eadfd3] bg-[rgba(255,248,241,0.82)] p-4 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  name="acceptRouteTerms"
+                  className="mt-1 h-4 w-4 accent-[#0f766e]"
+                />
+                <span>
+                  I accept the Razorpay Route onboarding and settlement terms for this shop owner account.
+                </span>
+              </label>
             </div>
           )}
         </div>
@@ -343,6 +438,7 @@ export function ShopSetupForm({
       </div>
 
       {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
+      {statusMessage ? <p className="mt-4 text-sm text-emerald-700">{statusMessage}</p> : null}
 
       <div className="mt-6 flex justify-end">
         <button type="submit" disabled={loading} className="btn-primary">

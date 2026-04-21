@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireApiRole } from "@/lib/auth/session";
 import { getOrderById, getShopById, prepareOrderPayment } from "@/lib/firebase/firestore-admin";
-import { createRazorpayOrder, getRazorpayKeyId } from "@/lib/payments/razorpay";
 import {
   canShopReceiveOnlinePayments,
   getShopPaymentUnavailableMessage,
 } from "@/lib/payments/shop-readiness";
+import { createRazorpayOrder, getRazorpayKeyId } from "@/lib/payments/razorpay";
 
 export async function POST(request: Request) {
   try {
@@ -41,6 +41,10 @@ export async function POST(request: Request) {
     }
 
     const shop = await getShopById(order.shopId);
+
+    if (!shop) {
+      return NextResponse.json({ error: "Shop not found." }, { status: 404 });
+    }
 
     if (!canShopReceiveOnlinePayments(shop)) {
       return NextResponse.json(
