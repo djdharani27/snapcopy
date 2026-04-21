@@ -3,7 +3,10 @@ import { requireApiAdmin } from "@/lib/auth/admin";
 import { createShop, getUserProfileById } from "@/lib/firebase/firestore-admin";
 import {
   parseGoogleMapsUrl,
+  parsePhone,
   parsePrice,
+  parsePostalCode,
+  parseRequiredText,
   parseRazorpayLinkedAccountId,
   parseServices,
 } from "@/lib/shops/validation";
@@ -15,6 +18,9 @@ export async function POST(request: Request) {
       ownerId,
       shopName,
       address,
+      city,
+      state,
+      postalCode,
       googleMapsUrl,
       phone,
       description,
@@ -38,12 +44,22 @@ export async function POST(request: Request) {
       );
     }
 
+    const parsedShopName = String(shopName).trim();
+    const parsedAddress = String(address).trim();
+    const parsedCity = parseRequiredText(city, "City");
+    const parsedState = parseRequiredText(state, "State");
+    const parsedPostalCode = parsePostalCode(postalCode);
+    const parsedPhone = parsePhone(phone);
+
     const shop = await createShop({
       ownerId: owner.uid,
-      shopName: String(shopName).trim(),
-      address: String(address).trim(),
+      shopName: parsedShopName,
+      address: parsedAddress,
+      city: parsedCity,
+      state: parsedState,
+      postalCode: parsedPostalCode,
       googleMapsUrl: parseGoogleMapsUrl(googleMapsUrl),
-      phone: String(phone).trim(),
+      phone: parsedPhone,
       description: String(description || "").trim(),
       services: parseServices(services),
       razorpayLinkedAccountId: parseRazorpayLinkedAccountId(razorpayLinkedAccountId),

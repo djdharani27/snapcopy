@@ -42,7 +42,7 @@ export async function GET(
     headers.set("Cache-Control", "no-store");
     headers.set("Content-Disposition", `attachment; filename="${safeFileName}"`);
 
-    return new Response(bytes, { headers });
+    return new Response(new Uint8Array(bytes), { headers });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to download file." },

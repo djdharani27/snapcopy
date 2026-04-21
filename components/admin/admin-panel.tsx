@@ -71,6 +71,9 @@ export function AdminPanel({
           ownerId: formData.get("ownerId"),
           shopName: formData.get("shopName"),
           address: formData.get("address"),
+          city: formData.get("city"),
+          state: formData.get("state"),
+          postalCode: formData.get("postalCode"),
           googleMapsUrl: formData.get("googleMapsUrl"),
           phone: formData.get("phone"),
           description: formData.get("description"),
@@ -522,6 +525,35 @@ export function AdminPanel({
               Address
             </label>
             <input id="address" name="address" className="input" required />
+          </div>
+
+          <div>
+            <label className="label" htmlFor="city">
+              City
+            </label>
+            <input id="city" name="city" className="input" required />
+          </div>
+
+          <div>
+            <label className="label" htmlFor="state">
+              State
+            </label>
+            <input id="state" name="state" className="input" required />
+          </div>
+
+          <div>
+            <label className="label" htmlFor="postalCode">
+              Pincode
+            </label>
+            <input
+              id="postalCode"
+              name="postalCode"
+              className="input"
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              required
+            />
           </div>
 
           <div className="md:col-span-2">
