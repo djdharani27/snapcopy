@@ -35,16 +35,6 @@ body {
   font-family: var(--font-manrope), sans-serif;
 }
 
-@keyframes beta-marquee-scroll {
-  0% {
-    transform: translate3d(0, 0, 0);
-  }
-
-  100% {
-    transform: translate3d(-50%, 0, 0);
-  }
-}
-
 a {
   color: inherit;
   text-decoration: none;
@@ -63,30 +53,6 @@ textarea {
     radial-gradient(circle at top left, rgba(201, 109, 56, 0.18), transparent 24%),
     radial-gradient(circle at top right, rgba(33, 92, 79, 0.15), transparent 30%),
     linear-gradient(180deg, #f7f2ea 0%, #efe7dd 48%, #f7f2ea 100%);
-}
-
-.beta-marquee {
-  @apply overflow-hidden border-b py-2 text-[11px] font-bold uppercase tracking-[0.28em];
-  border-color: rgba(29, 27, 25, 0.08);
-  background: rgba(29, 27, 25, 0.94);
-  color: #f8ebdb;
-}
-
-.beta-marquee__track {
-  display: flex;
-  width: max-content;
-  animation: beta-marquee-scroll 16s linear infinite;
-}
-
-.beta-marquee__group {
-  display: flex;
-  flex: 0 0 auto;
-}
-
-.beta-marquee__track span {
-  flex: 0 0 auto;
-  padding-right: 2.5rem;
-  white-space: nowrap;
 }
 
 .panel {

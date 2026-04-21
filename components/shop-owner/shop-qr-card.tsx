@@ -26,7 +26,7 @@ export function ShopQrCard({ shopId }: ShopQrCardProps) {
           alt="Shop QR code"
           width={224}
           height={224}
-          className="mx-auto h-56 w-56 rounded-xl"
+          className="mx-auto h-auto w-full max-w-56 rounded-xl"
           unoptimized
         />
       </div>

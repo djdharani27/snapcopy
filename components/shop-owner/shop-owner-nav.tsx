@@ -8,7 +8,7 @@ export function ShopOwnerNav({
   return (
     <nav
       aria-label="Shop owner sections"
-      className="flex min-w-max items-center gap-1.5"
+      className="flex max-w-full flex-wrap items-center gap-1.5"
     >
       <Link
         href="/shop-owner/dashboard"

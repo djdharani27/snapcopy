@@ -45,11 +45,11 @@ export function RoleSelectionForm({ nextPath = "" }: { nextPath?: string }) {
   }
 
   return (
-    <div className="panel-strong w-full max-w-2xl p-8">
-      <div className="mb-6 flex items-start justify-between gap-4">
+    <div className="panel-strong w-full max-w-2xl p-5 sm:p-8">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="eyebrow">One-time setup</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-900">
+          <h1 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-900 sm:text-3xl">
             Start printing
           </h1>
           <p className="mt-3 text-sm leading-7 text-slate-600">
@@ -60,7 +60,7 @@ export function RoleSelectionForm({ nextPath = "" }: { nextPath?: string }) {
           type="button"
           onClick={() => void handleRoleSelect("shop_owner")}
           disabled={loading}
-          className="btn-secondary shrink-0"
+          className="btn-secondary w-full shrink-0 sm:w-auto"
         >
           {loading && activeRole === "shop_owner" ? "Opening..." : "Own a shop"}
         </button>
@@ -72,14 +72,14 @@ export function RoleSelectionForm({ nextPath = "" }: { nextPath?: string }) {
         disabled={loading}
         className="w-full rounded-[28px] border border-[#c96d38] bg-[rgba(255,241,228,0.92)] px-6 py-8 text-left shadow-[0_18px_36px_rgba(156,76,32,0.12)] transition hover:border-[#b65f2f]"
       >
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-2xl font-semibold text-slate-900">Print</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               Browse shops, upload files, and place your print order.
             </p>
           </div>
-          <span className="rounded-full bg-[#c96d38] px-4 py-2 text-sm font-semibold text-white">
+          <span className="inline-flex w-full items-center justify-center rounded-full bg-[#c96d38] px-4 py-2 text-sm font-semibold text-white sm:w-auto">
             {loading && activeRole === "customer" ? "Opening..." : "Continue"}
           </span>
         </div>

@@ -53,10 +53,10 @@ export function LoginCard() {
   }
 
   return (
-    <div className="panel-strong w-full max-w-md p-8">
+    <div className="panel-strong w-full max-w-md p-5 sm:p-8">
       <div className="mb-8">
         <p className="eyebrow">SnapCopy</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-900">
+        <h1 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-900 sm:text-3xl">
           Sign in to send print orders
         </h1>
         <p className="mt-3 text-sm leading-7 text-slate-600">

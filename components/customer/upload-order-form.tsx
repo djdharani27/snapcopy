@@ -149,7 +149,7 @@ export function UploadOrderForm({
                 Add files and pick the shop
               </h3>
             </div>
-            <div className="inline-flex w-fit rounded-full bg-[#f5decc] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#9c4c20]">
+            <div className="inline-flex w-fit self-start rounded-full bg-[#f5decc] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#9c4c20]">
               Required
             </div>
           </div>
@@ -335,8 +335,8 @@ export function UploadOrderForm({
                 </span>
               </p>
             ) : null}
-            <div className="mt-6 flex justify-end">
-              <button type="button" onClick={handleSuccessConfirm} className="btn-primary">
+          <div className="mt-6 flex justify-end">
+              <button type="button" onClick={handleSuccessConfirm} className="btn-primary w-full sm:w-auto">
                 OK
               </button>
             </div>

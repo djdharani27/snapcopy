@@ -43,11 +43,11 @@ export function CustomerOrdersList({
           canAcceptOnlinePayment;
 
         return (
-          <article key={order.id} className="panel p-5">
+          <article key={order.id} className="panel p-4 sm:p-5">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div>
                 <p className="eyebrow">Order</p>
-                <div className="mt-2 flex items-center gap-3">
+                <div className="mt-2 flex flex-wrap items-center gap-3">
                   <h3 className="text-xl font-semibold tracking-[-0.03em] text-slate-900">
                     {shop?.shopName || "Shop"}
                   </h3>
@@ -98,7 +98,7 @@ export function CustomerOrdersList({
                 </div>
               </div>
 
-              <div className="rounded-[24px] bg-[rgba(255,247,239,0.95)] p-4 text-left md:min-w-56 md:text-right">
+              <div className="w-full rounded-[24px] bg-[rgba(255,247,239,0.95)] p-4 text-left md:min-w-56 md:w-auto md:text-right">
                 {order.finalAmount !== null && order.finalAmount !== undefined ? (
                   <>
                     <p className="text-sm text-slate-500">Final amount</p>
@@ -135,7 +135,7 @@ export function CustomerOrdersList({
                 {shop ? (
                   <Link
                     href={`/customer/shop/${shop.id}`}
-                    className="btn-secondary mt-4"
+                    className="btn-secondary mt-4 w-full md:w-auto"
                   >
                     Order again
                   </Link>

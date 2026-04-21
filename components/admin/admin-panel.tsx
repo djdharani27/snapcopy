@@ -232,7 +232,7 @@ export function AdminPanel({
 
   return (
     <div className="space-y-6">
-      <section className="panel p-6">
+      <section className="panel p-4 sm:p-6">
         <div className="mb-6">
           <p className="text-sm text-slate-500">Billing settings</p>
           <h2 className="mt-2 text-xl font-semibold text-slate-900">Platform billing</h2>
@@ -424,7 +424,7 @@ export function AdminPanel({
         {billingMessage ? <p className="mt-4 text-sm text-teal-700">{billingMessage}</p> : null}
       </section>
 
-      <section className="panel p-6">
+      <section className="panel p-4 sm:p-6">
         <div className="mb-6">
           <p className="text-sm text-slate-500">Audit trail</p>
           <h2 className="mt-2 text-xl font-semibold text-slate-900">Billing changes</h2>
@@ -466,7 +466,7 @@ export function AdminPanel({
         )}
       </section>
 
-      <section className="panel p-6">
+      <section className="panel p-4 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-sm text-slate-500">Storage maintenance</p>
@@ -482,7 +482,7 @@ export function AdminPanel({
             type="button"
             onClick={handleClearStorage}
             disabled={cleanupLoading}
-            className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
+            className="w-full rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
           >
             {cleanupLoading ? "Deleting files..." : "Delete downloaded files"}
           </button>
@@ -490,7 +490,7 @@ export function AdminPanel({
         {storageMessage ? <p className="mt-4 text-sm text-teal-700">{storageMessage}</p> : null}
       </section>
 
-      <section className="panel p-6">
+      <section className="panel p-4 sm:p-6">
         <div className="mb-6">
           <p className="text-sm text-slate-500">Shop creation</p>
           <h2 className="mt-2 text-xl font-semibold text-slate-900">Create shop</h2>
@@ -678,7 +678,7 @@ export function AdminPanel({
           </div>
 
           <div className="md:col-span-2 flex justify-end">
-            <button type="submit" disabled={formLoading} className="btn-primary">
+            <button type="submit" disabled={formLoading} className="btn-primary w-full sm:w-auto">
               {formLoading ? "Creating..." : "Create shop"}
             </button>
           </div>
@@ -687,7 +687,7 @@ export function AdminPanel({
         {formError ? <p className="mt-4 text-sm text-red-600">{formError}</p> : null}
       </section>
 
-      <section className="panel p-6">
+      <section className="panel p-4 sm:p-6">
         <div className="mb-6">
           <p className="text-sm text-slate-500">Shop management</p>
           <h2 className="mt-2 text-xl font-semibold text-slate-900">Delete shops</h2>
@@ -717,7 +717,7 @@ export function AdminPanel({
                   type="button"
                   onClick={() => handleDeleteShop(shop.id, shop.shopName)}
                   disabled={deletingShopId === shop.id}
-                  className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="w-full rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70 md:w-auto"
                 >
                   {deletingShopId === shop.id ? "Deleting..." : "Delete shop"}
                 </button>

@@ -9,7 +9,7 @@ export function CustomerNav({
   return (
     <nav
       aria-label="Customer sections"
-      className="flex min-w-max items-center gap-1.5"
+      className="flex max-w-full flex-wrap items-center gap-1.5"
     >
       <ShopQrScanButton variant="icon" />
       <Link

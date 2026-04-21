@@ -263,10 +263,10 @@ export function OrdersTable({
     <div className="space-y-4">
       {localOrders.map((order) => (
         <article key={order.id} className="panel overflow-hidden">
-          <div className="flex flex-col gap-4 border-b border-[#eadfd3] px-5 py-5 md:flex-row md:items-start md:justify-between">
+          <div className="flex flex-col gap-4 border-b border-[#eadfd3] px-4 py-4 sm:px-5 sm:py-5 md:flex-row md:items-start md:justify-between">
             <div>
               <p className="eyebrow">Incoming order</p>
-              <div className="mt-2 flex items-center gap-3">
+              <div className="mt-2 flex flex-wrap items-center gap-3">
                 <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-900">
                   {order.customerName}
                 </h2>
@@ -332,7 +332,7 @@ export function OrdersTable({
               ) : null}
             </div>
 
-            <div className="grid gap-3 rounded-[24px] bg-[rgba(255,247,239,0.95)] p-4 text-sm text-slate-600 md:text-right">
+            <div className="w-full grid gap-3 rounded-[24px] bg-[rgba(255,247,239,0.95)] p-4 text-sm text-slate-600 md:w-auto md:text-right">
               <p>Print: {order.printType === "color" ? "Color" : "Black & white"}</p>
               <p>
                 Sides:{" "}
@@ -342,7 +342,7 @@ export function OrdersTable({
             </div>
           </div>
 
-          <div className="grid gap-5 px-5 py-5 lg:grid-cols-[1.3fr_0.7fr]">
+          <div className="grid gap-5 px-4 py-4 sm:px-5 sm:py-5 lg:grid-cols-[1.3fr_0.7fr]">
             <div>
               <p className="mb-2 text-sm font-semibold text-slate-900">Notes</p>
               <p className="text-sm leading-6 text-slate-600">

@@ -109,10 +109,10 @@ export function ShopSetupForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="panel-strong mx-auto max-w-4xl p-8">
+    <form onSubmit={handleSubmit} className="panel-strong mx-auto max-w-4xl p-4 sm:p-6 lg:p-8">
       <div className="mb-6">
         <p className="eyebrow">Shop setup</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-900">
+        <h1 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-900 sm:text-3xl">
           {shop ? "Manage your print shop" : "Create your print shop"}
         </h1>
         <p className="mt-3 text-sm leading-7 text-slate-600">
@@ -441,7 +441,7 @@ export function ShopSetupForm({
       {statusMessage ? <p className="mt-4 text-sm text-emerald-700">{statusMessage}</p> : null}
 
       <div className="mt-6 flex justify-end">
-        <button type="submit" disabled={loading} className="btn-primary">
+        <button type="submit" disabled={loading} className="btn-primary w-full sm:w-auto">
           {loading ? (shop ? "Saving..." : "Creating...") : shop ? "Save changes" : "Create shop"}
         </button>
       </div>
