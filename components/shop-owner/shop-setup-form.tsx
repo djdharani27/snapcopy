@@ -261,7 +261,7 @@ export function ShopSetupForm({
 
         <div className="md:col-span-2">
           <p className="label">Razorpay settlement</p>
-          {isApproved && hasLinkedAccount ? (
+          {hasLinkedAccount ? (
             <div className="rounded-[24px] border border-[#eadfd3] bg-[rgba(255,248,241,0.82)] p-4 text-sm text-slate-600">
               <p className="font-semibold text-slate-900">
                 Linked account: {shop?.razorpayLinkedAccountId}
@@ -273,123 +273,122 @@ export function ShopSetupForm({
                 Bank: {shop?.bankIfsc || "-"} / xxxx{shop?.bankAccountLast4 || ""}
               </p>
               <p className="mt-2 text-xs text-slate-500">
-                This shop is approved and can continue serving customers. After online payment
-                verification, the server creates the Route transfer to this account.
+                {isApproved
+                  ? "This shop is approved and can continue serving customers. After online payment verification, the server creates the Route transfer to this account."
+                  : "This linked account will receive Route payouts after onboarding is activated."}
               </p>
-              <button
-                type="button"
-                onClick={() => void handleSyncStatus()}
-                disabled={syncingStatus}
-                className="btn-secondary mt-4"
-                {...hydrationSafeProps}
-              >
-                {syncingStatus ? "Syncing..." : "Sync Razorpay status"}
-              </button>
             </div>
-          ) : (
-            <div className="grid gap-5 md:grid-cols-2">
-              <div className="md:col-span-2 rounded-[24px] border border-[#eadfd3] bg-[rgba(255,248,241,0.82)] p-4 text-sm text-slate-600">
-                Admin approval is required before Razorpay linked account onboarding runs. This
-                affects online payouts, not whether the approved shop can fulfill orders.
-                {hasLinkedAccount ? (
-                  <>
-                    <br />
-                    Current linked account: {shop?.razorpayLinkedAccountId}
-                  </>
-                ) : null}
-                {shop?.razorpayProductStatus ? (
-                  <>
-                    <br />
-                    Route product status: {shop.razorpayProductStatus}
-                  </>
-                ) : null}
-                {isApproved ? (
-                  <>
-                    <br />
-                    Your shop can stay live while customers pay offline until Route activation is
-                    complete.
-                  </>
-                ) : null}
-              </div>
+          ) : null}
 
-              <div>
-                <label className="label" htmlFor="bankAccountHolderName">
-                  Account holder name
-                </label>
-                <input
-                  id="bankAccountHolderName"
-                  name="bankAccountHolderName"
-                  className="input"
-                  defaultValue={shop?.bankAccountHolderName || profile.name || ""}
-                  required
-                  {...hydrationSafeProps}
-                />
-              </div>
+          <div className="mt-5 grid gap-5 md:grid-cols-2">
+            <div className="md:col-span-2 rounded-[24px] border border-[#eadfd3] bg-[rgba(255,248,241,0.82)] p-4 text-sm text-slate-600">
+              {hasLinkedAccount
+                ? "Update the payout details below and save to resubmit Razorpay Route onboarding for review."
+                : "Admin approval is required before Razorpay linked account onboarding runs. This affects online payouts, not whether the approved shop can fulfill orders."}
+              {isApproved ? (
+                <>
+                  <br />
+                  Your shop can stay live while customers pay offline until Route activation is
+                  complete.
+                </>
+              ) : null}
+            </div>
 
-              <div>
-                <label className="label" htmlFor="bankIfsc">
-                  IFSC
-                </label>
-                <input
-                  id="bankIfsc"
-                  name="bankIfsc"
-                  className="input"
-                  defaultValue={shop?.bankIfsc || ""}
-                  placeholder="HDFC0001234"
-                  required
-                  {...hydrationSafeProps}
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="label" htmlFor="bankAccountNumber">
-                  Bank account number
-                </label>
-                <input
-                  id="bankAccountNumber"
-                  name="bankAccountNumber"
-                  className="input"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  placeholder="Enter the settlement bank account number"
-                  defaultValue={shop?.pendingBankAccountNumber || ""}
-                  required
-                  {...hydrationSafeProps}
-                />
-              </div>
-
-              <div>
-                <label className="label" htmlFor="ownerPan">
-                  Owner PAN
-                </label>
-                <input
-                  id="ownerPan"
-                  name="ownerPan"
-                  className="input"
-                  placeholder="ABCDE1234F"
-                  autoCapitalize="characters"
-                  defaultValue={shop?.pendingOwnerPan || ""}
-                  required
-                  {...hydrationSafeProps}
-                />
-              </div>
-
-              <label className="md:col-span-2 flex items-start gap-3 rounded-[22px] border border-[#eadfd3] bg-[rgba(255,248,241,0.82)] p-4 text-sm text-slate-600">
-                <input
-                  type="checkbox"
-                  name="acceptRouteTerms"
-                  className="mt-1 h-4 w-4 accent-[#0f766e]"
-                  defaultChecked={Boolean(shop?.pendingRouteTermsAccepted)}
-                  required
-                  {...hydrationSafeProps}
-                />
-                <span>
-                  I accept the Razorpay Route onboarding and settlement terms for this shop owner
-                  account.
-                </span>
+            <div>
+              <label className="label" htmlFor="bankAccountHolderName">
+                Account holder name
               </label>
+              <input
+                id="bankAccountHolderName"
+                name="bankAccountHolderName"
+                className="input"
+                defaultValue={shop?.bankAccountHolderName || profile.name || ""}
+                required
+                {...hydrationSafeProps}
+              />
             </div>
-          )}
+
+            <div>
+              <label className="label" htmlFor="bankIfsc">
+                IFSC
+              </label>
+              <input
+                id="bankIfsc"
+                name="bankIfsc"
+                className="input"
+                defaultValue={shop?.bankIfsc || ""}
+                placeholder="HDFC0001234"
+                required
+                {...hydrationSafeProps}
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="label" htmlFor="bankAccountNumber">
+                Bank account number
+              </label>
+              <input
+                id="bankAccountNumber"
+                name="bankAccountNumber"
+                className="input"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder={
+                  hasLinkedAccount
+                    ? "Re-enter the settlement bank account number to update Razorpay onboarding"
+                    : "Enter the settlement bank account number"
+                }
+                defaultValue={shop?.pendingBankAccountNumber || ""}
+                required
+                {...hydrationSafeProps}
+              />
+            </div>
+
+            <div>
+              <label className="label" htmlFor="ownerPan">
+                Owner PAN
+              </label>
+              <input
+                id="ownerPan"
+                name="ownerPan"
+                className="input"
+                placeholder="ABCDE1234F"
+                autoCapitalize="characters"
+                defaultValue={shop?.pendingOwnerPan || ""}
+                required
+                {...hydrationSafeProps}
+              />
+            </div>
+
+            <label className="md:col-span-2 flex items-start gap-3 rounded-[22px] border border-[#eadfd3] bg-[rgba(255,248,241,0.82)] p-4 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                name="acceptRouteTerms"
+                className="mt-1 h-4 w-4 accent-[#0f766e]"
+                defaultChecked={Boolean(shop?.pendingRouteTermsAccepted) || isApproved}
+                required
+                {...hydrationSafeProps}
+              />
+              <span>
+                I accept the Razorpay Route onboarding and settlement terms for this shop owner
+                account.
+              </span>
+            </label>
+
+            {hasLinkedAccount ? (
+              <div className="md:col-span-2">
+                <button
+                  type="button"
+                  onClick={() => void handleSyncStatus()}
+                  disabled={syncingStatus}
+                  className="btn-secondary"
+                  {...hydrationSafeProps}
+                >
+                  {syncingStatus ? "Syncing..." : "Sync Razorpay status"}
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
 
         <div className="md:col-span-2">

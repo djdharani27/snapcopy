@@ -60,27 +60,37 @@ export async function approveShopAndRunRouteOnboarding(shop: Shop) {
       });
 
   const razorpayLinkedAccountId = parseRazorpayLinkedAccountId(linkedAccount.id);
+  const existingStakeholderId = String(shop.razorpayStakeholderId || "").trim();
+  const existingRouteProductId = String(shop.razorpayProductId || "").trim();
 
-  const stakeholder = await createRazorpayStakeholder({
-    accountId: razorpayLinkedAccountId,
-    name: parsedBankAccountHolderName,
-    email: profile.email,
-    phone: shop.phone,
-    pan: parsedOwnerPan,
-    address: shop.address,
-    city: shop.city || "",
-    state: shop.state || "",
-    postalCode: shop.postalCode || "",
-  });
+  const stakeholderId =
+    existingStakeholderId ||
+    (
+      await createRazorpayStakeholder({
+        accountId: razorpayLinkedAccountId,
+        name: parsedBankAccountHolderName,
+        email: profile.email,
+        phone: shop.phone,
+        pan: parsedOwnerPan,
+        address: shop.address,
+        city: shop.city || "",
+        state: shop.state || "",
+        postalCode: shop.postalCode || "",
+      })
+    ).id;
 
-  const routeProduct = await requestRazorpayRouteProductConfiguration({
-    accountId: razorpayLinkedAccountId,
-    tncAccepted: acceptedRouteTerms,
-  });
+  const routeProductId =
+    existingRouteProductId ||
+    (
+      await requestRazorpayRouteProductConfiguration({
+        accountId: razorpayLinkedAccountId,
+        tncAccepted: acceptedRouteTerms,
+      })
+    ).id;
 
   const updatedRouteProduct = await updateRazorpayRouteProductConfiguration({
     accountId: razorpayLinkedAccountId,
-    productId: routeProduct.id,
+    productId: routeProductId,
     accountNumber: parsedBankAccountNumber,
     ifscCode: parsedBankIfsc,
     beneficiaryName: parsedBankAccountHolderName,
@@ -92,7 +102,7 @@ export async function approveShopAndRunRouteOnboarding(shop: Shop) {
     approvalStatus: "approved",
     razorpayLinkedAccountId,
     razorpayLinkedAccountStatus: linkedAccount.status,
-    razorpayStakeholderId: stakeholder.id,
+    razorpayStakeholderId: stakeholderId,
     razorpayProductId: updatedRouteProduct.id,
     razorpayProductStatus: updatedRouteProduct.activation_status,
     bankAccountHolderName: parsedBankAccountHolderName,
