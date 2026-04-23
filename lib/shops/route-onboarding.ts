@@ -46,6 +46,7 @@ export async function approveShopAndRunRouteOnboarding(shop: Shop) {
     state: shop.state || "",
     postalCode: shop.postalCode || "",
     description: shop.description || "Local print and copy shop",
+    pan: parsedOwnerPan,
   });
 
   const razorpayLinkedAccountId = parseRazorpayLinkedAccountId(linkedAccount.id);

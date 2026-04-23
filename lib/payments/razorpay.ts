@@ -166,7 +166,10 @@ export async function createRazorpayLinkedAccount(params: {
   state: string;
   postalCode: string;
   businessType?: string;
+  businessCategory?: string;
+  businessSubcategory?: string;
   description?: string;
+  pan?: string;
 }) {
   const response = await fetch("https://api.razorpay.com/v2/accounts", {
     method: "POST",
@@ -184,6 +187,11 @@ export async function createRazorpayLinkedAccount(params: {
       business_type: params.businessType || "proprietorship",
       contact_name: params.contactName,
       profile: {
+        category: params.businessCategory || process.env.RAZORPAY_ROUTE_BUSINESS_CATEGORY || "other_services",
+        subcategory:
+          params.businessSubcategory ||
+          process.env.RAZORPAY_ROUTE_BUSINESS_SUBCATEGORY ||
+          "business_services",
         business_model: params.description || "Local print and document services",
         addresses: {
           registered: {
@@ -195,6 +203,13 @@ export async function createRazorpayLinkedAccount(params: {
           },
         },
       },
+      ...(params.pan
+        ? {
+            legal_info: {
+              pan: params.pan,
+            },
+          }
+        : {}),
     }),
   });
 
