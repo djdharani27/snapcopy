@@ -15,6 +15,12 @@ import {
   parseRazorpayLinkedAccountId,
 } from "@/lib/shops/validation";
 import type { Shop } from "@/types";
+import crypto from "crypto";
+
+function buildRazorpayReferenceId(shop: Shop) {
+  const digest = crypto.createHash("sha1").update(`${shop.id}:${shop.ownerId}`).digest("hex");
+  return `shp_${digest.slice(0, 16)}`;
+}
 
 export async function approveShopAndRunRouteOnboarding(shop: Shop) {
   const profile = await getUserProfileById(shop.ownerId);
@@ -40,7 +46,7 @@ export async function approveShopAndRunRouteOnboarding(shop: Shop) {
     phone: shop.phone,
     legalBusinessName: shop.shopName,
     contactName: profile.name || shop.shopName,
-    referenceId: `shop_${shop.ownerId}`,
+    referenceId: buildRazorpayReferenceId(shop),
     address: shop.address,
     city: shop.city || "",
     state: shop.state || "",
