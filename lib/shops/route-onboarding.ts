@@ -2,6 +2,7 @@ import { getUserProfileById, updateShopApproval } from "@/lib/firebase/firestore
 import {
   createRazorpayLinkedAccount,
   createRazorpayStakeholder,
+  fetchRazorpayLinkedAccount,
   requestRazorpayRouteProductConfiguration,
   updateRazorpayRouteProductConfiguration,
 } from "@/lib/payments/razorpay";
@@ -41,19 +42,22 @@ export async function approveShopAndRunRouteOnboarding(shop: Shop) {
     "Owner must accept the Razorpay Route terms before approval.",
   );
 
-  const linkedAccount = await createRazorpayLinkedAccount({
-    email: profile.email,
-    phone: shop.phone,
-    legalBusinessName: shop.shopName,
-    contactName: profile.name || shop.shopName,
-    referenceId: buildRazorpayReferenceId(shop),
-    address: shop.address,
-    city: shop.city || "",
-    state: shop.state || "",
-    postalCode: shop.postalCode || "",
-    description: shop.description || "Local print and copy shop",
-    pan: parsedOwnerPan,
-  });
+  const existingLinkedAccountId = String(shop.razorpayLinkedAccountId || "").trim();
+  const linkedAccount = existingLinkedAccountId
+    ? await fetchRazorpayLinkedAccount(parseRazorpayLinkedAccountId(existingLinkedAccountId))
+    : await createRazorpayLinkedAccount({
+        email: profile.email,
+        phone: shop.phone,
+        legalBusinessName: shop.shopName,
+        contactName: profile.name || shop.shopName,
+        referenceId: buildRazorpayReferenceId(shop),
+        address: shop.address,
+        city: shop.city || "",
+        state: shop.state || "",
+        postalCode: shop.postalCode || "",
+        description: shop.description || "Local print and copy shop",
+        pan: parsedOwnerPan,
+      });
 
   const razorpayLinkedAccountId = parseRazorpayLinkedAccountId(linkedAccount.id);
 
