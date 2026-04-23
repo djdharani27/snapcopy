@@ -7,6 +7,7 @@ import {
   updateShopApproval,
   updateShopRouteDetails,
 } from "@/lib/firebase/firestore-admin";
+import { approveShopAndRunRouteOnboarding } from "@/lib/shops/route-onboarding";
 
 export async function PATCH(
   request: Request,
@@ -24,10 +25,7 @@ export async function PATCH(
     }
 
     if (action === "approve") {
-      const approvedShop = await updateShopApproval({
-        shopId: shop.id,
-        approvalStatus: "approved",
-      });
+      const approvedShop = await approveShopAndRunRouteOnboarding(shop);
       return NextResponse.json({ shop: approvedShop });
     }
 
