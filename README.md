@@ -206,7 +206,7 @@ Deploy [firestore.indexes.json](/C:/Users/gearz/OneDrive/Documents/New----CODE/A
 - If Firebase Admin is missing, protected routes and API uploads will fail by design.
 - Razorpay Route must be enabled on your Razorpay account.
 - Each linked account has a 24-hour cooling period before transfers can be initiated.
-- Shop setup now creates the linked account, creates a Route stakeholder, requests the Route product, and updates the settlement configuration with the submitted bank account details. The current integration defaults the linked-account business type to `proprietorship`.
+- Shop setup now creates the linked account, creates a Route stakeholder, requests the Route product, and updates the settlement configuration with the submitted bank account details. The current integration defaults the linked-account business type to `individual`.
 - Customer checkout creates a normal Razorpay order with the full amount.
 - After payment verification, the server reads `platform_settings/billing` and calculates the flat transaction fee, estimated processing fee, GST, and transferable amount.
 - The server then creates a separate Razorpay Route transfer from the captured payment to the shop owner's linked account.

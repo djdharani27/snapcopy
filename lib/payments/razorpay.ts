@@ -190,7 +190,8 @@ export async function createRazorpayLinkedAccount(params: {
   description?: string;
   pan?: string;
 }) {
-  const businessType = (params.businessType || "proprietorship").trim().toLowerCase();
+  const businessType = (params.businessType || "individual").trim().toLowerCase();
+  const usesStakeholderPanOnly = ["individual", "proprietorship"].includes(businessType);
   const businessProfile = getRazorpayRouteBusinessProfile({
     businessCategory: params.businessCategory,
     businessSubcategory: params.businessSubcategory,
@@ -226,7 +227,7 @@ export async function createRazorpayLinkedAccount(params: {
           },
         },
       },
-      ...(params.pan && businessType !== "proprietorship"
+      ...(params.pan && !usesStakeholderPanOnly
         ? {
             legal_info: {
               pan: params.pan,
