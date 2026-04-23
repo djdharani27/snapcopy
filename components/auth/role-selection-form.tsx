@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { UserRole } from "@/types";
+import { normalizeInternalPath } from "@/lib/utils/url";
 
 export function RoleSelectionForm({ nextPath = "" }: { nextPath?: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [activeRole, setActiveRole] = useState<UserRole | null>(null);
   const [error, setError] = useState("");
+  const redirectPath = normalizeInternalPath(nextPath);
 
   async function handleRoleSelect(role: UserRole) {
     setLoading(true);
@@ -29,7 +31,7 @@ export function RoleSelectionForm({ nextPath = "" }: { nextPath?: string }) {
 
       router.replace(
         role === "customer"
-          ? nextPath || "/customer/shops"
+          ? redirectPath || "/customer/shops"
           : "/shop-owner/setup",
       );
     } catch (submissionError) {

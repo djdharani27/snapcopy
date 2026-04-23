@@ -6,6 +6,7 @@ import type {
   OrderStatus,
   OrderWithFiles,
   Shop,
+  ShopApprovalStatus,
   UserProfile,
   UserRole,
 } from "@/types";
@@ -50,6 +51,13 @@ function mapDoc<T>(id: string, data: FirebaseFirestore.DocumentData) {
 function normalizeShop(shop: Shop): Shop {
   return {
     ...shop,
+    approvalStatus:
+      shop.approvalStatus === "pending_approval" || shop.approvalStatus === "rejected"
+        ? shop.approvalStatus
+        : "approved",
+    approvalSubmittedAt: shop.approvalSubmittedAt || null,
+    approvedAt: shop.approvedAt || null,
+    rejectedAt: shop.rejectedAt || null,
     city: String(shop.city || "").trim(),
     state: String(shop.state || "").trim(),
     postalCode: String(shop.postalCode || "").trim(),
@@ -66,6 +74,9 @@ function normalizeShop(shop: Shop): Shop {
     bankAccountHolderName: String(shop.bankAccountHolderName || "").trim(),
     bankIfsc: String(shop.bankIfsc || "").trim(),
     bankAccountLast4: String(shop.bankAccountLast4 || "").trim(),
+    pendingBankAccountNumber: String(shop.pendingBankAccountNumber || "").trim(),
+    pendingOwnerPan: String(shop.pendingOwnerPan || "").trim(),
+    pendingRouteTermsAccepted: Boolean(shop.pendingRouteTermsAccepted),
     pricing: {
       blackWhiteSingle: Number(shop.pricing?.blackWhiteSingle || 0),
       blackWhiteDouble: Number(shop.pricing?.blackWhiteDouble || 0),
@@ -166,19 +177,26 @@ export async function getUsersByRole(role: UserRole) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export async function getAllShops() {
+export async function getAllShops(options?: { includeUnapproved?: boolean }) {
   const snapshot = await adminDb()
     .collection("shops")
     .orderBy("shopName", "asc")
     .get();
 
-  return snapshot.docs.map((doc) => normalizeShop(mapDoc<Shop>(doc.id, doc.data())));
+  const shops = snapshot.docs.map((doc) => normalizeShop(mapDoc<Shop>(doc.id, doc.data())));
+  return options?.includeUnapproved
+    ? shops
+    : shops.filter((shop) => shop.approvalStatus === "approved");
 }
 
-export async function getShopById(shopId: string) {
+export async function getShopById(shopId: string, options?: { includeUnapproved?: boolean }) {
   const snapshot = await adminDb().collection("shops").doc(shopId).get();
   if (!snapshot.exists) return null;
-  return normalizeShop(mapDoc<Shop>(snapshot.id, snapshot.data() ?? {}));
+  const shop = normalizeShop(mapDoc<Shop>(snapshot.id, snapshot.data() ?? {}));
+  if (!options?.includeUnapproved && shop.approvalStatus !== "approved") {
+    return null;
+  }
+  return shop;
 }
 
 export async function getShopByOwnerId(ownerId: string) {
@@ -195,6 +213,7 @@ export async function getShopByOwnerId(ownerId: string) {
 
 export async function createShop(params: {
   ownerId: string;
+  approvalStatus?: ShopApprovalStatus;
   shopName: string;
   address: string;
   city: string;
@@ -212,6 +231,9 @@ export async function createShop(params: {
   bankAccountHolderName?: string;
   bankIfsc?: string;
   bankAccountLast4?: string;
+  pendingBankAccountNumber?: string;
+  pendingOwnerPan?: string;
+  pendingRouteTermsAccepted?: boolean;
   pricing: Shop["pricing"];
 }) {
   const existing = await getShopByOwnerId(params.ownerId);
@@ -223,6 +245,11 @@ export async function createShop(params: {
   await ref.set({
     id: ref.id,
     ownerId: params.ownerId,
+    approvalStatus: params.approvalStatus || "approved",
+    approvalSubmittedAt:
+      params.approvalStatus === "pending_approval" ? FieldValue.serverTimestamp() : null,
+    approvedAt: params.approvalStatus === "approved" ? FieldValue.serverTimestamp() : null,
+    rejectedAt: null,
     shopName: params.shopName,
     address: params.address,
     city: params.city,
@@ -240,16 +267,20 @@ export async function createShop(params: {
     bankAccountHolderName: params.bankAccountHolderName || "",
     bankIfsc: params.bankIfsc || "",
     bankAccountLast4: params.bankAccountLast4 || "",
+    pendingBankAccountNumber: params.pendingBankAccountNumber || "",
+    pendingOwnerPan: params.pendingOwnerPan || "",
+    pendingRouteTermsAccepted: Boolean(params.pendingRouteTermsAccepted),
     pricing: params.pricing,
     createdAt: FieldValue.serverTimestamp(),
   });
 
-  return getShopById(ref.id);
+  return getShopById(ref.id, { includeUnapproved: true });
 }
 
 export async function updateShop(params: {
   shopId: string;
   ownerId: string;
+  approvalStatus?: ShopApprovalStatus;
   shopName: string;
   address: string;
   city: string;
@@ -267,15 +298,25 @@ export async function updateShop(params: {
   bankAccountHolderName?: string;
   bankIfsc?: string;
   bankAccountLast4?: string;
+  pendingBankAccountNumber?: string;
+  pendingOwnerPan?: string;
+  pendingRouteTermsAccepted?: boolean;
   pricing: Shop["pricing"];
 }) {
-  const existing = await getShopById(params.shopId);
+  const existing = await getShopById(params.shopId, { includeUnapproved: true });
   if (!existing || existing.ownerId !== params.ownerId) {
     throw new Error("Shop not found.");
   }
 
   await adminDb().collection("shops").doc(params.shopId).set(
     {
+      ...(params.approvalStatus ? { approvalStatus: params.approvalStatus } : {}),
+      ...(params.approvalStatus === "pending_approval"
+        ? {
+            approvalSubmittedAt: FieldValue.serverTimestamp(),
+            rejectedAt: null,
+          }
+        : {}),
       shopName: params.shopName,
       address: params.address,
       city: params.city,
@@ -293,12 +334,15 @@ export async function updateShop(params: {
       bankAccountHolderName: params.bankAccountHolderName || "",
       bankIfsc: params.bankIfsc || "",
       bankAccountLast4: params.bankAccountLast4 || "",
+      pendingBankAccountNumber: params.pendingBankAccountNumber || "",
+      pendingOwnerPan: params.pendingOwnerPan || "",
+      pendingRouteTermsAccepted: Boolean(params.pendingRouteTermsAccepted),
       pricing: params.pricing,
     },
     { merge: true },
   );
 
-  return getShopById(params.shopId);
+  return getShopById(params.shopId, { includeUnapproved: true });
 }
 
 export async function updateShopRazorpayStatus(params: {
@@ -318,7 +362,66 @@ export async function updateShopRazorpayStatus(params: {
     { merge: true },
   );
 
-  return getShopById(params.shopId);
+  return getShopById(params.shopId, { includeUnapproved: true });
+}
+
+export async function updateShopApproval(params: {
+  shopId: string;
+  approvalStatus: ShopApprovalStatus;
+  razorpayLinkedAccountId?: string;
+  razorpayLinkedAccountStatus?: string;
+  razorpayStakeholderId?: string;
+  razorpayProductId?: string;
+  razorpayProductStatus?: string;
+  bankAccountHolderName?: string;
+  bankIfsc?: string;
+  bankAccountLast4?: string;
+}) {
+  await adminDb().collection("shops").doc(params.shopId).set(
+    {
+      approvalStatus: params.approvalStatus,
+      ...(params.approvalStatus === "approved"
+        ? {
+            approvedAt: FieldValue.serverTimestamp(),
+            rejectedAt: null,
+          }
+        : {}),
+      ...(params.approvalStatus === "rejected"
+        ? {
+            rejectedAt: FieldValue.serverTimestamp(),
+          }
+        : {}),
+      ...(params.approvalStatus !== "pending_approval" ? { approvalSubmittedAt: null } : {}),
+      ...(params.razorpayLinkedAccountId !== undefined
+        ? { razorpayLinkedAccountId: params.razorpayLinkedAccountId }
+        : {}),
+      ...(params.razorpayLinkedAccountStatus !== undefined
+        ? { razorpayLinkedAccountStatus: params.razorpayLinkedAccountStatus }
+        : {}),
+      ...(params.razorpayStakeholderId !== undefined
+        ? { razorpayStakeholderId: params.razorpayStakeholderId }
+        : {}),
+      ...(params.razorpayProductId !== undefined ? { razorpayProductId: params.razorpayProductId } : {}),
+      ...(params.razorpayProductStatus !== undefined
+        ? { razorpayProductStatus: params.razorpayProductStatus }
+        : {}),
+      ...(params.bankAccountHolderName !== undefined
+        ? { bankAccountHolderName: params.bankAccountHolderName }
+        : {}),
+      ...(params.bankIfsc !== undefined ? { bankIfsc: params.bankIfsc } : {}),
+      ...(params.bankAccountLast4 !== undefined ? { bankAccountLast4: params.bankAccountLast4 } : {}),
+      ...(params.approvalStatus === "approved"
+        ? {
+            pendingBankAccountNumber: "",
+            pendingOwnerPan: "",
+            pendingRouteTermsAccepted: false,
+          }
+        : {}),
+    },
+    { merge: true },
+  );
+
+  return getShopById(params.shopId, { includeUnapproved: true });
 }
 
 export async function createOrderWithFiles(params: {
@@ -342,14 +445,28 @@ export async function createOrderWithFiles(params: {
   const month = String(istDate.getUTCMonth() + 1).padStart(2, "0");
   const year = String(istDate.getUTCFullYear());
   const datePrefix = `${day}${month}${year}_`;
-  const sameShopOrdersSnapshot = await db
-    .collection("orders")
-    .where("shopId", "==", params.shopId)
-    .get();
-  const todaysOrderCount = sameShopOrdersSnapshot.docs.filter((doc) =>
-    String(doc.data().trackingCode || "").startsWith(datePrefix),
-  ).length;
-  const nthOrder = String(todaysOrderCount + 1).padStart(3, "0");
+  const counterRef = db
+    .collection("shops")
+    .doc(params.shopId)
+    .collection("order_counters")
+    .doc(datePrefix.slice(0, -1));
+  const nextSequence = await db.runTransaction(async (transaction) => {
+    const counterSnapshot = await transaction.get(counterRef);
+    const currentValue = Number(counterSnapshot.data()?.count || 0);
+    const nextValue = currentValue + 1;
+
+    transaction.set(
+      counterRef,
+      {
+        count: nextValue,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+
+    return nextValue;
+  });
+  const nthOrder = String(nextSequence).padStart(3, "0");
   const trackingCode = `${day}${month}${year}_${nthOrder}`;
 
   batch.set(orderRef, {

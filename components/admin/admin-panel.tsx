@@ -13,21 +13,17 @@ interface AdminPanelProps {
 }
 
 interface BillingFormState {
-  shopCreationFeeRupees: string;
   transactionFeeRupees: string;
   estimatedRazorpayFeePercent: string;
   estimatedGstPercent: string;
-  shopCreationFeeEnabled: boolean;
   transactionFeeEnabled: boolean;
 }
 
 function getBillingFormState(billing: BillingConfig): BillingFormState {
   return {
-    shopCreationFeeRupees: String(formatPaiseToRupees(billing.shopCreationFeePaise)),
     transactionFeeRupees: String(formatPaiseToRupees(billing.transactionFeePaise)),
     estimatedRazorpayFeePercent: String(billing.estimatedRazorpayFeePercent),
     estimatedGstPercent: String(billing.estimatedGstPercent),
-    shopCreationFeeEnabled: billing.shopCreationFeeEnabled,
     transactionFeeEnabled: billing.transactionFeeEnabled,
   };
 }
@@ -47,6 +43,7 @@ export function AdminPanel({
   const [formError, setFormError] = useState("");
   const [formLoading, setFormLoading] = useState(false);
   const [deletingShopId, setDeletingShopId] = useState<string | null>(null);
+  const [reviewingShopId, setReviewingShopId] = useState<string | null>(null);
   const [cleanupLoading, setCleanupLoading] = useState(false);
   const [storageMessage, setStorageMessage] = useState("");
   const [billingMessage, setBillingMessage] = useState("");
@@ -55,6 +52,8 @@ export function AdminPanel({
   const [billingForm, setBillingForm] = useState<BillingFormState>(() =>
     getBillingFormState(billing),
   );
+  const pendingShops = shops.filter((shop) => shop.approvalStatus === "pending_approval");
+  const reviewedShops = shops.filter((shop) => shop.approvalStatus !== "pending_approval");
 
   async function handleCreateShop(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -113,13 +112,13 @@ export function AdminPanel({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          shopCreationFeePaise: Math.round(Number(billingForm.shopCreationFeeRupees || 0) * 100),
+          shopCreationFeePaise: billing.shopCreationFeePaise,
           transactionFeePaise: Math.round(Number(billingForm.transactionFeeRupees || 0) * 100),
           estimatedRazorpayFeePercent: Number(
             billingForm.estimatedRazorpayFeePercent || 0,
           ),
           estimatedGstPercent: Number(billingForm.estimatedGstPercent || 0),
-          shopCreationFeeEnabled: billingForm.shopCreationFeeEnabled,
+          shopCreationFeeEnabled: billing.shopCreationFeeEnabled,
           transactionFeeEnabled: billingForm.transactionFeeEnabled,
         }),
       });
@@ -197,6 +196,29 @@ export function AdminPanel({
     }
   }
 
+  async function handleReviewShop(shopId: string, action: "approve" | "reject") {
+    setReviewingShopId(shopId);
+    setFormError("");
+
+    try {
+      const response = await fetch(`/api/admin/shops/${shopId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Unable to update shop approval.");
+      }
+
+      router.refresh();
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Unable to update shop approval.");
+    } finally {
+      setReviewingShopId(null);
+    }
+  }
+
   async function handleClearStorage() {
     const confirmed = window.confirm(
       "Delete only files that have already been downloaded by a shop owner? This cannot be undone.",
@@ -235,22 +257,14 @@ export function AdminPanel({
       <section className="panel p-4 sm:p-6">
         <div className="mb-6">
           <p className="text-sm text-slate-500">Billing settings</p>
-          <h2 className="mt-2 text-xl font-semibold text-slate-900">Platform billing</h2>
+          <h2 className="mt-2 text-xl font-semibold text-slate-900">Payout billing</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            These values drive the existing Razorpay Route payout flow. Rupees are edited here,
-            while the backend stores all billing amounts in paise.
+            These values drive the existing Razorpay Route payout flow after a customer pays for an
+            order. Rupees are edited here, while the backend stores billing amounts in paise.
           </p>
         </div>
 
-        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm text-slate-500">Shop creation fee</p>
-            <p className="mt-2 text-xl font-semibold text-slate-900">
-              {billing.shopCreationFeeEnabled
-                ? formatCurrency(formatPaiseToRupees(billing.shopCreationFeePaise))
-                : "Disabled"}
-            </p>
-          </div>
+        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm text-slate-500">Transaction fee</p>
             <p className="mt-2 text-xl font-semibold text-slate-900">
@@ -274,26 +288,6 @@ export function AdminPanel({
         </div>
 
         <form onSubmit={handleSaveBilling} className="grid gap-5 md:grid-cols-2">
-          <div>
-            <label className="label" htmlFor="shopCreationFeeRupees">
-              Shop creation fee (INR)
-            </label>
-            <input
-              id="shopCreationFeeRupees"
-              type="number"
-              min="0"
-              step="0.01"
-              className="input"
-              value={billingForm.shopCreationFeeRupees}
-              onChange={(event) =>
-                setBillingForm((current) => ({
-                  ...current,
-                  shopCreationFeeRupees: event.target.value,
-                }))
-              }
-            />
-          </div>
-
           <div>
             <label className="label" htmlFor="transactionFeeRupees">
               Transaction fee (INR)
@@ -357,20 +351,6 @@ export function AdminPanel({
           <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
             <input
               type="checkbox"
-              checked={billingForm.shopCreationFeeEnabled}
-              onChange={(event) =>
-                setBillingForm((current) => ({
-                  ...current,
-                  shopCreationFeeEnabled: event.target.checked,
-                }))
-              }
-            />
-            Enable shop creation fee
-          </label>
-
-          <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
-            <input
-              type="checkbox"
               checked={billingForm.transactionFeeEnabled}
               onChange={(event) =>
                 setBillingForm((current) => ({
@@ -400,12 +380,6 @@ export function AdminPanel({
         <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4">
           <p className="text-sm font-semibold text-slate-900">Live summary</p>
           <div className="mt-3 space-y-2 text-sm text-slate-600">
-            <p>
-              Shop creation fee:{" "}
-              {billingForm.shopCreationFeeEnabled
-                ? formatCurrency(Number(billingForm.shopCreationFeeRupees || 0))
-                : "Disabled"}
-            </p>
             <p>
               Transaction fee:{" "}
               {billingForm.transactionFeeEnabled
@@ -447,11 +421,6 @@ export function AdminPanel({
                   Transaction fee:{" "}
                   {formatCurrency(formatPaiseToRupees(log.before.transactionFeePaise))} to{" "}
                   {formatCurrency(formatPaiseToRupees(log.after.transactionFeePaise))}
-                </p>
-                <p>
-                  Shop creation fee:{" "}
-                  {formatCurrency(formatPaiseToRupees(log.before.shopCreationFeePaise))} to{" "}
-                  {formatCurrency(formatPaiseToRupees(log.after.shopCreationFeePaise))}
                 </p>
                 <p>
                   Gateway fee: {log.before.estimatedRazorpayFeePercent}% to{" "}
@@ -689,6 +658,60 @@ export function AdminPanel({
 
       <section className="panel p-4 sm:p-6">
         <div className="mb-6">
+          <p className="text-sm text-slate-500">Approval queue</p>
+          <h2 className="mt-2 text-xl font-semibold text-slate-900">Pending shop requests</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Shop-owner submissions stay blocked here until an admin approves them. Approval triggers
+            the Route onboarding API flow.
+          </p>
+        </div>
+
+        {pendingShops.length === 0 ? (
+          <p className="text-sm text-slate-600">No shop requests are waiting for approval.</p>
+        ) : (
+          <div className="space-y-4">
+            {pendingShops.map((shop) => (
+              <div
+                key={shop.id}
+                className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600"
+              >
+                <p className="font-semibold text-slate-900">{shop.shopName}</p>
+                <p className="mt-1">{shop.address}</p>
+                <p className="mt-1">
+                  Owner: {shopOwners.find((owner) => owner.uid === shop.ownerId)?.email || shop.ownerId}
+                </p>
+                <p className="mt-1">
+                  Submitted: {formatAuditDate(shop.approvalSubmittedAt || shop.createdAt)}
+                </p>
+                <p className="mt-1">
+                  Settlement: {shop.bankAccountHolderName || "-"} / {shop.bankIfsc || "-"}
+                </p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void handleReviewShop(shop.id, "approve")}
+                    disabled={reviewingShopId === shop.id}
+                    className="btn-primary"
+                  >
+                    {reviewingShopId === shop.id ? "Saving..." : "Approve"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleReviewShop(shop.id, "reject")}
+                    disabled={reviewingShopId === shop.id}
+                    className="btn-secondary"
+                  >
+                    {reviewingShopId === shop.id ? "Saving..." : "Reject"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="panel p-4 sm:p-6">
+        <div className="mb-6">
           <p className="text-sm text-slate-500">Shop management</p>
           <h2 className="mt-2 text-xl font-semibold text-slate-900">Delete shops</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -696,11 +719,11 @@ export function AdminPanel({
           </p>
         </div>
 
-        {shops.length === 0 ? (
+        {reviewedShops.length === 0 ? (
           <p className="text-sm text-slate-600">No shops found.</p>
         ) : (
           <div className="space-y-4">
-            {shops.map((shop) => (
+            {reviewedShops.map((shop) => (
               <div
                 key={shop.id}
                 className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 md:flex-row md:items-center md:justify-between"

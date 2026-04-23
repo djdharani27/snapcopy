@@ -16,13 +16,11 @@ export function ShopSetupForm({
   const [syncingStatus, setSyncingStatus] = useState(false);
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const approvalStatus = shop?.approvalStatus || null;
   const hasLinkedAccount = Boolean(shop?.razorpayLinkedAccountId);
-  const needsRouteOnboarding =
-    !shop?.razorpayLinkedAccountId ||
-    !shop?.razorpayStakeholderId ||
-    !shop?.razorpayProductId ||
-    !shop?.razorpayProductStatus ||
-    shop?.razorpayProductStatus !== "activated";
+  const isApproved = approvalStatus === "approved";
+  const isPending = approvalStatus === "pending_approval";
+  const isRejected = approvalStatus === "rejected";
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -62,20 +60,18 @@ export function ShopSetupForm({
 
       const payload = await response.json();
       if (!response.ok) {
-        throw new Error(payload.error || "Unable to create shop.");
+        throw new Error(payload.error || "Unable to submit shop.");
       }
 
-      if (payload.warning) {
-        setStatusMessage(payload.warning);
+      if (payload.message) {
+        setStatusMessage(payload.message);
       }
 
-      router.replace("/shop-owner/dashboard");
+      router.replace("/shop-owner/setup");
       router.refresh();
     } catch (submissionError) {
       setError(
-        submissionError instanceof Error
-          ? submissionError.message
-          : "Unable to create shop.",
+        submissionError instanceof Error ? submissionError.message : "Unable to submit shop.",
       );
     } finally {
       setLoading(false);
@@ -113,14 +109,32 @@ export function ShopSetupForm({
       <div className="mb-6">
         <p className="eyebrow">Shop setup</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-900 sm:text-3xl">
-          {shop ? "Manage your print shop" : "Create your print shop"}
+          {isPending
+            ? "Your shop is waiting for approval"
+            : isRejected
+              ? "Resubmit your print shop"
+              : shop
+                ? "Manage your print shop"
+                : "Create your print shop"}
         </h1>
         <p className="mt-3 text-sm leading-7 text-slate-600">
-          Set your shop details, services, and base print prices so customers know the expected cost.
+          Set your shop details, services, settlement details, and base print prices. Admin
+          approval is required before customers can access the shop.
         </p>
         <p className="mt-2 text-xs leading-6 text-slate-500">
           Razorpay linked account email: {profile.email || "missing email on your profile"}
         </p>
+        {isPending ? (
+          <div className="mt-4 rounded-[24px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            Your shop request is pending admin approval. You can still update the details below and
+            resubmit them.
+          </div>
+        ) : null}
+        {isRejected ? (
+          <div className="mt-4 rounded-[24px] border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+            The last request was rejected. Review the details below and submit again.
+          </div>
+        ) : null}
       </div>
 
       <div className="grid gap-5 md:grid-cols-2">
@@ -154,13 +168,7 @@ export function ShopSetupForm({
           <label className="label" htmlFor="city">
             City
           </label>
-          <input
-            id="city"
-            name="city"
-            className="input"
-            defaultValue={shop?.city || ""}
-            required
-          />
+          <input id="city" name="city" className="input" defaultValue={shop?.city || ""} required />
         </div>
 
         <div>
@@ -213,13 +221,7 @@ export function ShopSetupForm({
           <label className="label" htmlFor="phone">
             Phone
           </label>
-          <input
-            id="phone"
-            name="phone"
-            className="input"
-            defaultValue={shop?.phone || ""}
-            required
-          />
+          <input id="phone" name="phone" className="input" defaultValue={shop?.phone || ""} required />
         </div>
 
         <div>
@@ -237,25 +239,20 @@ export function ShopSetupForm({
 
         <div className="md:col-span-2">
           <p className="label">Razorpay settlement</p>
-          {hasLinkedAccount && !needsRouteOnboarding ? (
+          {isApproved && hasLinkedAccount ? (
             <div className="rounded-[24px] border border-[#eadfd3] bg-[rgba(255,248,241,0.82)] p-4 text-sm text-slate-600">
               <p className="font-semibold text-slate-900">
                 Linked account: {shop?.razorpayLinkedAccountId}
               </p>
-              <p className="mt-2">
-                Status: {shop?.razorpayLinkedAccountStatus || "created"}
-              </p>
-              <p className="mt-2">
-                Route product: {shop?.razorpayProductStatus || "not_requested"}
-              </p>
-              <p className="mt-2">
-                Beneficiary: {shop?.bankAccountHolderName || "-"}
-              </p>
+              <p className="mt-2">Status: {shop?.razorpayLinkedAccountStatus || "created"}</p>
+              <p className="mt-2">Route product: {shop?.razorpayProductStatus || "not_requested"}</p>
+              <p className="mt-2">Beneficiary: {shop?.bankAccountHolderName || "-"}</p>
               <p className="mt-2">
                 Bank: {shop?.bankIfsc || "-"} / xxxx{shop?.bankAccountLast4 || ""}
               </p>
               <p className="mt-2 text-xs text-slate-500">
-                This shop already has a Razorpay linked account. After payment verification, the server creates the Route transfer to this account.
+                This shop is approved. After payment verification, the server creates the Route
+                transfer to this account.
               </p>
               <button
                 type="button"
@@ -268,25 +265,22 @@ export function ShopSetupForm({
             </div>
           ) : (
             <div className="grid gap-5 md:grid-cols-2">
-              {hasLinkedAccount ? (
-                <div className="md:col-span-2 rounded-[24px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                  Linked account: {shop?.razorpayLinkedAccountId}
-                  <br />
-                  Route product status: {shop?.razorpayProductStatus || "not_requested"}
-                  <br />
-                  Complete the missing Route onboarding fields below so payouts can be activated.
-                  <div className="mt-4">
-                    <button
-                      type="button"
-                      onClick={() => void handleSyncStatus()}
-                      disabled={syncingStatus}
-                      className="btn-secondary"
-                    >
-                      {syncingStatus ? "Syncing..." : "Sync Razorpay status"}
-                    </button>
-                  </div>
-                </div>
-              ) : null}
+              <div className="md:col-span-2 rounded-[24px] border border-[#eadfd3] bg-[rgba(255,248,241,0.82)] p-4 text-sm text-slate-600">
+                Admin approval is required before Razorpay linked account onboarding runs.
+                {hasLinkedAccount ? (
+                  <>
+                    <br />
+                    Current linked account: {shop?.razorpayLinkedAccountId}
+                  </>
+                ) : null}
+                {shop?.razorpayProductStatus ? (
+                  <>
+                    <br />
+                    Route product status: {shop.razorpayProductStatus}
+                  </>
+                ) : null}
+              </div>
+
               <div>
                 <label className="label" htmlFor="bankAccountHolderName">
                   Account holder name
@@ -296,6 +290,7 @@ export function ShopSetupForm({
                   name="bankAccountHolderName"
                   className="input"
                   defaultValue={shop?.bankAccountHolderName || profile.name || ""}
+                  required
                 />
               </div>
 
@@ -309,6 +304,7 @@ export function ShopSetupForm({
                   className="input"
                   defaultValue={shop?.bankIfsc || ""}
                   placeholder="HDFC0001234"
+                  required
                 />
               </div>
 
@@ -323,10 +319,9 @@ export function ShopSetupForm({
                   inputMode="numeric"
                   autoComplete="off"
                   placeholder="Enter the settlement bank account number"
+                  defaultValue={shop?.pendingBankAccountNumber || ""}
+                  required
                 />
-                <p className="mt-2 text-xs text-slate-500">
-                  Optional for now. Add it later when Razorpay Route is enabled. Only the last 4 digits are stored in this app.
-                </p>
               </div>
 
               <div>
@@ -339,10 +334,9 @@ export function ShopSetupForm({
                   className="input"
                   placeholder="ABCDE1234F"
                   autoCapitalize="characters"
+                  defaultValue={shop?.pendingOwnerPan || ""}
+                  required
                 />
-                <p className="mt-2 text-xs text-slate-500">
-                  Optional for now. Used later to complete Razorpay Route onboarding.
-                </p>
               </div>
 
               <label className="md:col-span-2 flex items-start gap-3 rounded-[22px] border border-[#eadfd3] bg-[rgba(255,248,241,0.82)] p-4 text-sm text-slate-600">
@@ -350,9 +344,12 @@ export function ShopSetupForm({
                   type="checkbox"
                   name="acceptRouteTerms"
                   className="mt-1 h-4 w-4 accent-[#0f766e]"
+                  defaultChecked={Boolean(shop?.pendingRouteTermsAccepted)}
+                  required
                 />
                 <span>
-                  I accept the Razorpay Route onboarding and settlement terms for this shop owner account.
+                  I accept the Razorpay Route onboarding and settlement terms for this shop owner
+                  account.
                 </span>
               </label>
             </div>
@@ -442,7 +439,13 @@ export function ShopSetupForm({
 
       <div className="mt-6 flex justify-end">
         <button type="submit" disabled={loading} className="btn-primary w-full sm:w-auto">
-          {loading ? (shop ? "Saving..." : "Creating...") : shop ? "Save changes" : "Create shop"}
+          {loading
+            ? "Submitting..."
+            : isApproved
+              ? "Save changes"
+              : shop
+                ? "Resubmit for approval"
+                : "Submit for approval"}
         </button>
       </div>
     </form>

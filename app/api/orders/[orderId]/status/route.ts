@@ -36,9 +36,9 @@ export async function PATCH(
     }
 
     const numericFinalAmount = Number(finalAmount);
-    if (Number.isNaN(numericFinalAmount) || numericFinalAmount < 0) {
+    if (Number.isNaN(numericFinalAmount) || numericFinalAmount <= 0) {
       return NextResponse.json(
-        { error: "Valid final amount is required." },
+        { error: "A final amount greater than 0 is required." },
         { status: 400 },
       );
     }

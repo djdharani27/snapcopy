@@ -1,4 +1,5 @@
 export type UserRole = "customer" | "shop_owner";
+export type ShopApprovalStatus = "pending_approval" | "approved" | "rejected";
 
 export type OrderStatus = "pending" | "completed";
 export type PaymentStatus = "unpaid" | "paid";
@@ -46,6 +47,10 @@ export interface BillingAuditLog {
 export interface Shop {
   id: string;
   ownerId: string;
+  approvalStatus?: ShopApprovalStatus;
+  approvalSubmittedAt?: string | null;
+  approvedAt?: string | null;
+  rejectedAt?: string | null;
   shopName: string;
   address: string;
   city?: string;
@@ -63,6 +68,9 @@ export interface Shop {
   bankAccountHolderName?: string;
   bankIfsc?: string;
   bankAccountLast4?: string;
+  pendingBankAccountNumber?: string;
+  pendingOwnerPan?: string;
+  pendingRouteTermsAccepted?: boolean;
   pricing: {
     blackWhiteSingle: number;
     blackWhiteDouble: number;

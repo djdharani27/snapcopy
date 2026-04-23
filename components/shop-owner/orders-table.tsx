@@ -115,8 +115,8 @@ export function OrdersTable({
         [orderId]: rawFinalAmount,
       }));
 
-      if (status === "completed" && (Number.isNaN(finalAmount) || finalAmount < 0)) {
-        throw new Error("Enter a valid final amount before completing the order.");
+      if (status === "completed" && (Number.isNaN(finalAmount) || finalAmount <= 0)) {
+        throw new Error("Enter a valid final amount greater than 0 before completing the order.");
       }
 
       const response = await fetch(`/api/orders/${orderId}/status`, {

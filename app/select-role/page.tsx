@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { RoleSelectionForm } from "@/components/auth/role-selection-form";
 import { getCurrentUserProfile, requireAuth } from "@/lib/auth/session";
+import { normalizeInternalPath } from "@/lib/utils/url";
 
 export default async function SelectRolePage({
   searchParams,
@@ -10,7 +11,7 @@ export default async function SelectRolePage({
   await requireAuth();
   const profile = await getCurrentUserProfile();
   const { next } = await searchParams;
-  const nextPath = next || "";
+  const nextPath = normalizeInternalPath(next);
 
   if (profile) {
     redirect(

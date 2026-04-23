@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { LoginCard } from "@/components/auth/login-card";
 import { getCurrentUserProfile, getCurrentToken } from "@/lib/auth/session";
+import { normalizeInternalPath } from "@/lib/utils/url";
 
 export default async function LoginPage({
   searchParams,
@@ -10,18 +11,21 @@ export default async function LoginPage({
   const token = await getCurrentToken();
   const profile = await getCurrentUserProfile();
   const { next } = await searchParams;
-  const nextPath = next && next !== "/login" ? next : undefined;
+  const nextPath = normalizeInternalPath(next);
+  const redirectPath = nextPath && nextPath !== "/login" ? nextPath : undefined;
 
   if (token && profile) {
     redirect(
       profile.role === "customer"
-        ? nextPath || "/customer/shops"
+        ? redirectPath || "/customer/shops"
         : "/shop-owner/dashboard",
     );
   }
 
   if (token && !profile) {
-    redirect(nextPath ? `/select-role?next=${encodeURIComponent(nextPath)}` : "/select-role");
+    redirect(
+      redirectPath ? `/select-role?next=${encodeURIComponent(redirectPath)}` : "/select-role",
+    );
   }
 
   return (

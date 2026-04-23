@@ -8,7 +8,7 @@ import { getBillingAuditLogs, getBillingConfig } from "@/lib/platform/billing";
 export default async function AdminPage() {
   const decoded = await requireAdmin();
   const [shops, shopOwners, billing, billingAuditLogs] = await Promise.all([
-    getAllShops(),
+    getAllShops({ includeUnapproved: true }),
     getUsersByRole("shop_owner"),
     getBillingConfig(),
     getBillingAuditLogs(),
@@ -21,7 +21,7 @@ export default async function AdminPage() {
         email: decoded.email || "",
       }}
       title="Admin panel"
-      description="Manage platform billing, create shops, remove shops, and clear uploaded files from storage."
+      description="Manage payout billing, create shops, remove shops, and clear uploaded files from storage."
       actions={<RefreshButton />}
     >
       <AdminPanel

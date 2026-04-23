@@ -6,6 +6,7 @@ import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { useAuth } from "@/components/auth/auth-provider";
 import { getFirebaseAuth, hasFirebaseClientEnv } from "@/lib/firebase/client";
 import { setClientSession } from "@/lib/auth/client-session";
+import { normalizeInternalPath } from "@/lib/utils/url";
 
 export function LoginCard() {
   const router = useRouter();
@@ -14,18 +15,16 @@ export function LoginCard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const hasClientEnv = hasFirebaseClientEnv();
-  const nextPath =
-    searchParams.get("next") && searchParams.get("next") !== "/login"
-      ? searchParams.get("next")!
-      : "/";
+  const nextPath = normalizeInternalPath(searchParams.get("next"), "/");
+  const redirectPath = nextPath !== "/login" ? nextPath : "/";
 
   useEffect(() => {
     if (authLoading || !user) {
       return;
     }
 
-    router.replace(nextPath);
-  }, [authLoading, nextPath, router, user]);
+    router.replace(redirectPath);
+  }, [authLoading, redirectPath, router, user]);
 
   async function handleSignIn() {
     if (!hasClientEnv) {
@@ -41,7 +40,7 @@ export function LoginCard() {
       const credential = await signInWithPopup(getFirebaseAuth(), provider);
       const token = await credential.user.getIdToken(true);
       await setClientSession(token);
-      router.replace(nextPath);
+      router.replace(redirectPath);
     } catch (signInError) {
       setError(
         signInError instanceof Error

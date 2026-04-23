@@ -13,8 +13,16 @@ export default async function ShopOwnerSetupPage() {
   return (
     <DashboardShell
       profile={profile}
-      title={existingShop ? "Shop settings" : "Set up your shop"}
-      description="Create or manage the single shop profile used by this MVP. Customers will see your Google Maps location, services, and price list before placing orders."
+      title={
+        existingShop?.approvalStatus === "pending_approval"
+          ? "Approval pending"
+          : existingShop?.approvalStatus === "rejected"
+            ? "Resubmit your shop"
+            : existingShop
+              ? "Shop settings"
+              : "Set up your shop"
+      }
+      description="Submit your shop details for admin approval. Customers can see your shop and place orders only after approval is completed."
     >
       <ShopSetupForm shop={existingShop} profile={profile} />
     </DashboardShell>

@@ -26,10 +26,16 @@ export function PayOrderButton({
   phone?: string;
 }) {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const [paymentState, setPaymentState] = useState<"idle" | "starting" | "verifying">("idle");
+
+  const isBusy = paymentState !== "idle";
 
   async function handlePay() {
-    setLoading(true);
+    if (isBusy) {
+      return;
+    }
+
+    setPaymentState("starting");
 
     try {
       const createOrderResponse = await fetch("/api/orders/create", {
@@ -60,29 +66,44 @@ export function PayOrderButton({
           contact: phone || "",
         },
         handler: async (response: Record<string, string>) => {
-          const verifyResponse = await fetch("/api/payments/verify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              orderId,
-              razorpayOrderId: response.razorpay_order_id,
-              razorpayPaymentId: response.razorpay_payment_id,
-              razorpaySignature: response.razorpay_signature,
-            }),
-          });
+          setPaymentState("verifying");
 
-          const verifyPayload = await verifyResponse.json();
-          if (!verifyResponse.ok) {
-            throw new Error(verifyPayload.error || "Payment verification failed.");
-          }
+          try {
+            const verifyResponse = await fetch("/api/payments/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                orderId,
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature,
+              }),
+            });
 
-          if (verifyPayload.transferError) {
+            const verifyPayload = await verifyResponse.json();
+            if (!verifyResponse.ok) {
+              throw new Error(verifyPayload.error || "Payment verification failed.");
+            }
+
+            if (verifyPayload.transferError) {
+              window.alert(
+                `Payment received. Shop payout will be retried separately. ${verifyPayload.transferError}`,
+              );
+            }
+
+            router.refresh();
+          } catch (error) {
             window.alert(
-              `Payment received. Shop payout will be retried separately. ${verifyPayload.transferError}`,
+              error instanceof Error ? error.message : "Payment verification failed.",
             );
+          } finally {
+            setPaymentState("idle");
           }
-
-          router.refresh();
+        },
+        modal: {
+          ondismiss: () => {
+            setPaymentState("idle");
+          },
         },
         theme: {
           color: "#0f766e",
@@ -92,16 +113,19 @@ export function PayOrderButton({
       razorpay.open();
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "Unable to process payment.");
-    } finally {
-      setLoading(false);
+      setPaymentState("idle");
     }
   }
 
   return (
     <>
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
-      <button type="button" onClick={handlePay} disabled={loading} className="btn-primary mt-4">
-        {loading ? "Opening payment..." : `Pay now Rs. ${amount}`}
+      <button type="button" onClick={handlePay} disabled={isBusy} className="btn-primary mt-4">
+        {paymentState === "starting"
+          ? "Opening payment..."
+          : paymentState === "verifying"
+            ? "Verifying payment..."
+            : `Pay now Rs. ${amount}`}
       </button>
     </>
   );

@@ -17,7 +17,7 @@ export default async function ShopOwnerDashboardPage() {
   const { decoded, profile } = await requireRole("shop_owner");
   const shop = await getShopByOwnerId(decoded.uid);
 
-  if (!shop) {
+  if (!shop || shop.approvalStatus !== "approved") {
     redirect("/shop-owner/setup");
   }
 
