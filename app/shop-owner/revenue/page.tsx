@@ -44,11 +44,11 @@ export default async function ShopOwnerRevenuePage() {
   const dailyMetrics = new Map<string, { orderCount: number; revenue: number }>();
 
   for (const order of orders) {
-    if (order.paymentStatus !== "paid") {
+    if (order.paymentStatus !== "paid" || order.transferStatus === "reversed") {
       continue;
     }
 
-    const key = getDateKey(order.createdAt);
+    const key = getDateKey(order.paidAt || order.createdAt);
     const current = dailyMetrics.get(key) ?? { orderCount: 0, revenue: 0 };
 
     current.orderCount += 1;
@@ -130,7 +130,8 @@ export default async function ShopOwnerRevenuePage() {
           <div className="border-b border-slate-200 px-5 py-4">
             <h2 className="text-xl font-semibold text-slate-900">Daily totals</h2>
             <p className="mt-1 text-sm text-slate-600">
-              Only paid orders are included. Revenue reflects the server-calculated payout after the flat platform fee and payment-processing costs.
+              Only settled customer payments are included. Revenue reflects the server-calculated
+              seller payout after the platform fee and gateway charges.
             </p>
           </div>
           <div className="overflow-x-auto">

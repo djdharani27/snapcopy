@@ -11,6 +11,7 @@ export function ShopSetupForm({
   shop?: Shop | null;
   profile: UserProfile;
 }) {
+  const hydrationSafeProps = { suppressHydrationWarning: true as const };
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [syncingStatus, setSyncingStatus] = useState(false);
@@ -119,7 +120,8 @@ export function ShopSetupForm({
         </h1>
         <p className="mt-3 text-sm leading-7 text-slate-600">
           Set your shop details, services, settlement details, and base print prices. Admin
-          approval is required before customers can access the shop.
+          approval is required before customers can access the shop. Once approved, your shop can
+          keep accepting orders even if Razorpay online payout setup is still pending.
         </p>
         <p className="mt-2 text-xs leading-6 text-slate-500">
           Razorpay linked account email: {profile.email || "missing email on your profile"}
@@ -148,6 +150,7 @@ export function ShopSetupForm({
             className="input"
             defaultValue={shop?.shopName || ""}
             required
+            {...hydrationSafeProps}
           />
         </div>
 
@@ -161,6 +164,7 @@ export function ShopSetupForm({
             className="input"
             defaultValue={shop?.address || ""}
             required
+            {...hydrationSafeProps}
           />
         </div>
 
@@ -168,7 +172,14 @@ export function ShopSetupForm({
           <label className="label" htmlFor="city">
             City
           </label>
-          <input id="city" name="city" className="input" defaultValue={shop?.city || ""} required />
+          <input
+            id="city"
+            name="city"
+            className="input"
+            defaultValue={shop?.city || ""}
+            required
+            {...hydrationSafeProps}
+          />
         </div>
 
         <div>
@@ -181,6 +192,7 @@ export function ShopSetupForm({
             className="input"
             defaultValue={shop?.state || ""}
             required
+            {...hydrationSafeProps}
           />
         </div>
 
@@ -196,6 +208,7 @@ export function ShopSetupForm({
             pattern="[0-9]{6}"
             defaultValue={shop?.postalCode || ""}
             required
+            {...hydrationSafeProps}
           />
         </div>
 
@@ -211,6 +224,7 @@ export function ShopSetupForm({
             inputMode="url"
             defaultValue={shop?.googleMapsUrl || ""}
             placeholder="Paste the Google Maps share link"
+            {...hydrationSafeProps}
           />
           <p className="mt-2 text-xs text-slate-500">
             Optional. If you add it, users can open your shop directly in Google Maps.
@@ -221,7 +235,14 @@ export function ShopSetupForm({
           <label className="label" htmlFor="phone">
             Phone
           </label>
-          <input id="phone" name="phone" className="input" defaultValue={shop?.phone || ""} required />
+          <input
+            id="phone"
+            name="phone"
+            className="input"
+            defaultValue={shop?.phone || ""}
+            required
+            {...hydrationSafeProps}
+          />
         </div>
 
         <div>
@@ -234,6 +255,7 @@ export function ShopSetupForm({
             className="input"
             defaultValue={shop?.description || ""}
             placeholder="Short shop summary"
+            {...hydrationSafeProps}
           />
         </div>
 
@@ -251,14 +273,15 @@ export function ShopSetupForm({
                 Bank: {shop?.bankIfsc || "-"} / xxxx{shop?.bankAccountLast4 || ""}
               </p>
               <p className="mt-2 text-xs text-slate-500">
-                This shop is approved. After payment verification, the server creates the Route
-                transfer to this account.
+                This shop is approved and can continue serving customers. After online payment
+                verification, the server creates the Route transfer to this account.
               </p>
               <button
                 type="button"
                 onClick={() => void handleSyncStatus()}
                 disabled={syncingStatus}
                 className="btn-secondary mt-4"
+                {...hydrationSafeProps}
               >
                 {syncingStatus ? "Syncing..." : "Sync Razorpay status"}
               </button>
@@ -266,7 +289,8 @@ export function ShopSetupForm({
           ) : (
             <div className="grid gap-5 md:grid-cols-2">
               <div className="md:col-span-2 rounded-[24px] border border-[#eadfd3] bg-[rgba(255,248,241,0.82)] p-4 text-sm text-slate-600">
-                Admin approval is required before Razorpay linked account onboarding runs.
+                Admin approval is required before Razorpay linked account onboarding runs. This
+                affects online payouts, not whether the approved shop can fulfill orders.
                 {hasLinkedAccount ? (
                   <>
                     <br />
@@ -277,6 +301,13 @@ export function ShopSetupForm({
                   <>
                     <br />
                     Route product status: {shop.razorpayProductStatus}
+                  </>
+                ) : null}
+                {isApproved ? (
+                  <>
+                    <br />
+                    Your shop can stay live while customers pay offline until Route activation is
+                    complete.
                   </>
                 ) : null}
               </div>
@@ -291,6 +322,7 @@ export function ShopSetupForm({
                   className="input"
                   defaultValue={shop?.bankAccountHolderName || profile.name || ""}
                   required
+                  {...hydrationSafeProps}
                 />
               </div>
 
@@ -305,6 +337,7 @@ export function ShopSetupForm({
                   defaultValue={shop?.bankIfsc || ""}
                   placeholder="HDFC0001234"
                   required
+                  {...hydrationSafeProps}
                 />
               </div>
 
@@ -321,6 +354,7 @@ export function ShopSetupForm({
                   placeholder="Enter the settlement bank account number"
                   defaultValue={shop?.pendingBankAccountNumber || ""}
                   required
+                  {...hydrationSafeProps}
                 />
               </div>
 
@@ -336,6 +370,7 @@ export function ShopSetupForm({
                   autoCapitalize="characters"
                   defaultValue={shop?.pendingOwnerPan || ""}
                   required
+                  {...hydrationSafeProps}
                 />
               </div>
 
@@ -346,6 +381,7 @@ export function ShopSetupForm({
                   className="mt-1 h-4 w-4 accent-[#0f766e]"
                   defaultChecked={Boolean(shop?.pendingRouteTermsAccepted)}
                   required
+                  {...hydrationSafeProps}
                 />
                 <span>
                   I accept the Razorpay Route onboarding and settlement terms for this shop owner
@@ -366,6 +402,7 @@ export function ShopSetupForm({
             className="input"
             defaultValue={shop?.services?.join(", ") || ""}
             placeholder="Xerox, binding, lamination, scanning"
+            {...hydrationSafeProps}
           />
         </div>
 
@@ -382,6 +419,7 @@ export function ShopSetupForm({
             className="input"
             defaultValue={shop?.pricing?.blackWhiteSingle ?? 0}
             required
+            {...hydrationSafeProps}
           />
         </div>
 
@@ -398,6 +436,7 @@ export function ShopSetupForm({
             className="input"
             defaultValue={shop?.pricing?.blackWhiteDouble ?? 0}
             required
+            {...hydrationSafeProps}
           />
         </div>
 
@@ -414,6 +453,7 @@ export function ShopSetupForm({
             className="input"
             defaultValue={shop?.pricing?.colorSingle ?? 0}
             required
+            {...hydrationSafeProps}
           />
         </div>
 
@@ -430,6 +470,7 @@ export function ShopSetupForm({
             className="input"
             defaultValue={shop?.pricing?.colorDouble ?? 0}
             required
+            {...hydrationSafeProps}
           />
         </div>
       </div>
@@ -438,7 +479,12 @@ export function ShopSetupForm({
       {statusMessage ? <p className="mt-4 text-sm text-emerald-700">{statusMessage}</p> : null}
 
       <div className="mt-6 flex justify-end">
-        <button type="submit" disabled={loading} className="btn-primary w-full sm:w-auto">
+        <button
+          type="submit"
+          disabled={loading}
+          className="btn-primary w-full sm:w-auto"
+          {...hydrationSafeProps}
+        >
           {loading
             ? "Submitting..."
             : isApproved

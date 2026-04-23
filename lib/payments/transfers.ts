@@ -60,6 +60,8 @@ export async function ensureOrderTransfer(orderId: string) {
     estimatedRazorpayFeePercent: billingConfig.estimatedRazorpayFeePercent,
     estimatedGstPercent: billingConfig.estimatedGstPercent,
     transactionFeeEnabled: billingConfig.transactionFeeEnabled,
+    actualFeePaise: payment.fee,
+    actualTaxPaise: payment.tax,
   });
 
   await updateOrderTransferSnapshot({

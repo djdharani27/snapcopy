@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireApiRole } from "@/lib/auth/session";
-import { getOrderById, getShopById, prepareOrderPayment } from "@/lib/firebase/firestore-admin";
+import {
+  beginOrderPaymentIntent,
+  failOrderPaymentIntent,
+  finalizeOrderPaymentIntent,
+  getOrderById,
+  getShopById,
+} from "@/lib/firebase/firestore-admin";
 import {
   canShopReceiveOnlinePayments,
   getShopPaymentUnavailableMessage,
@@ -53,20 +59,69 @@ export async function POST(request: Request) {
       );
     }
 
-    const razorpayOrder = await createRazorpayOrder({
-      amountInPaise: Math.round(order.finalAmount * 100),
-      receipt: `snapcopy-${order.id}`,
-      notes: {
-        orderId: order.id,
-        shopId: order.shopId,
-        customerId: order.customerId,
-      },
+    const amountInPaise = Math.round(order.finalAmount * 100);
+    const paymentIntent = await beginOrderPaymentIntent({
+      orderId: order.id,
+      amountPaise: amountInPaise,
     });
 
-    await prepareOrderPayment({
-      orderId: order.id,
-      razorpayOrderId: razorpayOrder.id,
-    });
+    if (paymentIntent.action === "paid") {
+      return NextResponse.json({ error: "This order is already paid." }, { status: 400 });
+    }
+
+    if (paymentIntent.action === "creating") {
+      return NextResponse.json(
+        { error: "Payment is being prepared. Try again in a moment." },
+        { status: 409 },
+      );
+    }
+
+    if (paymentIntent.action === "reuse" && paymentIntent.razorpayOrderId) {
+      return NextResponse.json({
+        razorpayOrderId: paymentIntent.razorpayOrderId,
+        amount: paymentIntent.amountPaise,
+        currency: "INR",
+        keyId: getRazorpayKeyId(),
+        order,
+      });
+    }
+
+    let razorpayOrder;
+
+    try {
+      razorpayOrder = await createRazorpayOrder({
+        amountInPaise,
+        receipt: `snapcopy-${order.id}`,
+        notes: {
+          orderId: order.id,
+          shopId: order.shopId,
+          customerId: order.customerId,
+        },
+      });
+
+      await finalizeOrderPaymentIntent({
+        orderId: order.id,
+        razorpayOrderId: razorpayOrder.id,
+        amountPaise: amountInPaise,
+      });
+    } catch (error) {
+      if (razorpayOrder?.id) {
+        try {
+          await finalizeOrderPaymentIntent({
+            orderId: order.id,
+            razorpayOrderId: razorpayOrder.id,
+            amountPaise: amountInPaise,
+          });
+        } catch {
+          // Keep the original error and fall back to resetting the intent only if the remote
+          // order was never persisted locally.
+        }
+      } else {
+        await failOrderPaymentIntent(order.id);
+      }
+
+      throw error;
+    }
 
     return NextResponse.json({
       razorpayOrderId: razorpayOrder.id,

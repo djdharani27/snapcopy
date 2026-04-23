@@ -18,5 +18,5 @@ export function canShopReceiveOnlinePayments(
 }
 
 export function getShopPaymentUnavailableMessage() {
-  return "Online payment is disabled for this shop until Razorpay Route payout onboarding is fully activated. This can take about 7 days.";
+  return "This shop can continue accepting orders and serving customers. Online payment is temporarily unavailable until Razorpay Route payout onboarding is fully activated. Customers can pay the shop offline until then.";
 }

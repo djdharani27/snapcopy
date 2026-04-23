@@ -2,16 +2,17 @@ import { AdminPanel } from "@/components/admin/admin-panel";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { RefreshButton } from "@/components/layout/refresh-button";
 import { requireAdmin } from "@/lib/auth/admin";
-import { getAllShops, getUsersByRole } from "@/lib/firebase/firestore-admin";
+import { getAllShops, getOrdersNeedingTransferAttention, getUsersByRole } from "@/lib/firebase/firestore-admin";
 import { getBillingAuditLogs, getBillingConfig } from "@/lib/platform/billing";
 
 export default async function AdminPage() {
   const decoded = await requireAdmin();
-  const [shops, shopOwners, billing, billingAuditLogs] = await Promise.all([
+  const [shops, shopOwners, billing, billingAuditLogs, payoutAttentionOrders] = await Promise.all([
     getAllShops({ includeUnapproved: true }),
     getUsersByRole("shop_owner"),
     getBillingConfig(),
     getBillingAuditLogs(),
+    getOrdersNeedingTransferAttention(),
   ]);
 
   return (
@@ -29,6 +30,7 @@ export default async function AdminPage() {
         shopOwners={shopOwners}
         billing={billing}
         billingAuditLogs={billingAuditLogs}
+        payoutAttentionOrders={payoutAttentionOrders}
       />
     </DashboardShell>
   );

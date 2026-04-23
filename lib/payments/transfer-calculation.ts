@@ -4,6 +4,7 @@ export interface TransferCalculation {
   platformTransactionFeePaise: number;
   estimatedFeePaise: number;
   estimatedTaxPaise: number;
+  gatewayFeeSource: "actual" | "estimated";
   transferableAmountPaise: number;
 }
 
@@ -29,6 +30,8 @@ export function calculateTransferBreakdown(params: {
   estimatedRazorpayFeePercent?: number;
   estimatedGstPercent?: number;
   transactionFeeEnabled?: boolean;
+  actualFeePaise?: number | null;
+  actualTaxPaise?: number | null;
 }) {
   if (!Number.isInteger(params.amountPaise) || params.amountPaise <= 0) {
     throw new Error("Amount must be a positive integer in paise.");
@@ -54,10 +57,18 @@ export function calculateTransferBreakdown(params: {
     );
   const platformTransactionFeePaise =
     params.transactionFeeEnabled === false ? 0 : Math.max(0, configuredTransactionFeePaise);
-  const estimatedFeePaise = Math.ceil(
-    (params.amountPaise * estimatedRazorpayFeePercent) / 100,
-  );
-  const estimatedTaxPaise = Math.ceil((estimatedFeePaise * estimatedGstPercent) / 100);
+  const hasActualGatewayFees =
+    Number.isInteger(params.actualFeePaise) &&
+    Number(params.actualFeePaise) >= 0 &&
+    Number.isInteger(params.actualTaxPaise) &&
+    Number(params.actualTaxPaise) >= 0;
+  const estimatedFeePaise = hasActualGatewayFees
+    ? Number(params.actualFeePaise)
+    : Math.ceil((params.amountPaise * estimatedRazorpayFeePercent) / 100);
+  const estimatedTaxPaise = hasActualGatewayFees
+    ? Number(params.actualTaxPaise)
+    : Math.ceil((estimatedFeePaise * estimatedGstPercent) / 100);
+  const gatewayFeeSource = hasActualGatewayFees ? "actual" : "estimated";
   const transferableAmountPaise = Math.max(
     0,
     params.amountPaise -
@@ -70,6 +81,7 @@ export function calculateTransferBreakdown(params: {
     platformTransactionFeePaise,
     estimatedFeePaise,
     estimatedTaxPaise,
+    gatewayFeeSource,
     transferableAmountPaise,
   } satisfies TransferCalculation;
 }

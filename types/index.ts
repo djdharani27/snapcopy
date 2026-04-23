@@ -2,13 +2,17 @@ export type UserRole = "customer" | "shop_owner";
 export type ShopApprovalStatus = "pending_approval" | "approved" | "rejected";
 
 export type OrderStatus = "pending" | "completed";
-export type PaymentStatus = "unpaid" | "paid";
+export type PaymentStatus = "unpaid" | "paid" | "refund_pending" | "refunded" | "refund_failed";
 export type TransferStatus =
   | "not_created"
   | "pending"
   | "processing"
   | "success"
-  | "failed";
+  | "failed"
+  | "reversed"
+  | "partially_reversed";
+export type PaymentIntentStatus = "idle" | "creating" | "ready";
+export type GatewayFeeSource = "actual" | "estimated";
 
 export type PrintType = "color" | "black_white";
 
@@ -93,16 +97,21 @@ export interface Order {
   copies: number;
   finalAmount?: number | null;
   paymentStatus: PaymentStatus;
+  paymentIntentStatus?: PaymentIntentStatus | null;
+  paymentAttemptAmountPaise?: number | null;
   razorpayOrderId?: string | null;
   razorpayPaymentId?: string | null;
   platformCommissionPaise?: number | null;
   platformTransactionFeePaise?: number | null;
   estimatedFeePaise?: number | null;
   estimatedTaxPaise?: number | null;
+  gatewayFeeSource?: GatewayFeeSource | null;
   transferableAmountPaise?: number | null;
   transferId?: string | null;
   transferStatus?: TransferStatus | null;
   linkedAccountId?: string | null;
+  refundId?: string | null;
+  refundedAmountPaise?: number | null;
   paidAt?: string | null;
   status: OrderStatus;
   createdAt?: string | null;

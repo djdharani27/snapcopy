@@ -87,7 +87,7 @@ export function PayOrderButton({
 
             if (verifyPayload.transferError) {
               window.alert(
-                `Payment received. Shop payout will be retried separately. ${verifyPayload.transferError}`,
+                `Payment received. The platform team will retry the shop payout separately. ${verifyPayload.transferError}`,
               );
             }
 

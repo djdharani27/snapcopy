@@ -39,7 +39,7 @@ export function CustomerOrdersList({
           order.status === "completed" &&
           order.finalAmount !== null &&
           order.finalAmount !== undefined &&
-          order.paymentStatus !== "paid" &&
+          order.paymentStatus === "unpaid" &&
           canAcceptOnlinePayment;
 
         return (
@@ -122,7 +122,7 @@ export function CustomerOrdersList({
                 order.status === "completed" &&
                 order.finalAmount !== null &&
                 order.finalAmount !== undefined &&
-                order.paymentStatus !== "paid" ? (
+                order.paymentStatus === "unpaid" ? (
                   <div className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
                     {getShopPaymentUnavailableMessage()}
                   </div>
@@ -130,6 +130,21 @@ export function CustomerOrdersList({
                 {order.paymentStatus === "paid" ? (
                   <div className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
                     Payment received
+                  </div>
+                ) : null}
+                {order.paymentStatus === "refund_pending" ? (
+                  <div className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+                    Refund in progress
+                  </div>
+                ) : null}
+                {order.paymentStatus === "refunded" ? (
+                  <div className="mt-4 rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700">
+                    Refunded
+                  </div>
+                ) : null}
+                {order.paymentStatus === "refund_failed" ? (
+                  <div className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                    Refund failed. Support review is required.
                   </div>
                 ) : null}
                 {shop ? (

@@ -305,13 +305,17 @@ export function OrdersTable({
               {order.estimatedFeePaise !== null &&
               order.estimatedFeePaise !== undefined ? (
                 <p className="mt-2 text-sm text-slate-500">
-                  Payment processing fee: {formatCurrency(order.estimatedFeePaise / 100)}
+                  Gateway fee
+                  {order.gatewayFeeSource === "estimated" ? " (estimated)" : ""}:{" "}
+                  {formatCurrency(order.estimatedFeePaise / 100)}
                 </p>
               ) : null}
               {order.estimatedTaxPaise !== null &&
               order.estimatedTaxPaise !== undefined ? (
                 <p className="mt-2 text-sm text-slate-500">
-                  GST on fee: {formatCurrency(order.estimatedTaxPaise / 100)}
+                  GST on gateway fee
+                  {order.gatewayFeeSource === "estimated" ? " (estimated)" : ""}:{" "}
+                  {formatCurrency(order.estimatedTaxPaise / 100)}
                 </p>
               ) : null}
               {order.transferableAmountPaise !== null &&
@@ -328,6 +332,18 @@ export function OrdersTable({
               {order.paymentStatus === "paid" ? (
                 <p className="mt-2 text-sm font-semibold text-emerald-700">
                   Paid by customer
+                </p>
+              ) : order.paymentStatus === "refund_pending" ? (
+                <p className="mt-2 text-sm font-semibold text-amber-900">
+                  Refund in progress
+                </p>
+              ) : order.paymentStatus === "refunded" ? (
+                <p className="mt-2 text-sm font-semibold text-slate-700">
+                  Refunded
+                </p>
+              ) : order.paymentStatus === "refund_failed" ? (
+                <p className="mt-2 text-sm font-semibold text-rose-700">
+                  Refund failed
                 </p>
               ) : null}
             </div>
@@ -407,7 +423,9 @@ export function OrdersTable({
                   <p className="label">Completed</p>
                   {order.paymentStatus === "paid" ? (
                       <p className="text-sm text-slate-600">
-                        Payment is complete. The platform now calculates the flat platform fee, gateway cost, and payout before creating the Route transfer.
+                        Payment is complete. The platform uses the captured payment details to
+                        calculate the flat platform fee, gateway cost, and seller payout before
+                        creating the Route transfer.
                       </p>
                   ) : (
                     <>

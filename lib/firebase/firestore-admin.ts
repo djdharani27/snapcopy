@@ -1,5 +1,6 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase/admin";
+import { canShopReceiveOnlinePayments } from "@/lib/payments/shop-readiness";
 import type {
   Order,
   OrderFile,
@@ -43,6 +44,9 @@ function mapDoc<T>(id: string, data: FirebaseFirestore.DocumentData) {
     id,
     ...data,
     createdAt: timestampToIso(data.createdAt),
+    approvalSubmittedAt: timestampToIso(data.approvalSubmittedAt),
+    approvedAt: timestampToIso(data.approvedAt),
+    rejectedAt: timestampToIso(data.rejectedAt),
     paidAt: timestampToIso(data.paidAt),
     downloadedAt: timestampToIso(data.downloadedAt),
   } as T;
@@ -95,6 +99,11 @@ function normalizeOrder(order: Order): Order {
         ? null
         : Number(order.finalAmount),
     paymentStatus: order.paymentStatus || "unpaid",
+    paymentIntentStatus: order.paymentIntentStatus || "idle",
+    paymentAttemptAmountPaise:
+      order.paymentAttemptAmountPaise === null || order.paymentAttemptAmountPaise === undefined
+        ? null
+        : Number(order.paymentAttemptAmountPaise),
     razorpayOrderId: order.razorpayOrderId || null,
     razorpayPaymentId: order.razorpayPaymentId || null,
     platformCommissionPaise:
@@ -116,6 +125,10 @@ function normalizeOrder(order: Order): Order {
       order.estimatedTaxPaise === null || order.estimatedTaxPaise === undefined
         ? null
         : Number(order.estimatedTaxPaise),
+    gatewayFeeSource:
+      order.gatewayFeeSource === "actual" || order.gatewayFeeSource === "estimated"
+        ? order.gatewayFeeSource
+        : null,
     transferableAmountPaise:
       order.transferableAmountPaise === null || order.transferableAmountPaise === undefined
         ? null
@@ -123,6 +136,11 @@ function normalizeOrder(order: Order): Order {
     transferId: order.transferId || null,
     transferStatus: order.transferStatus || "not_created",
     linkedAccountId: order.linkedAccountId || null,
+    refundId: order.refundId || null,
+    refundedAmountPaise:
+      order.refundedAmountPaise === null || order.refundedAmountPaise === undefined
+        ? null
+        : Number(order.refundedAmountPaise),
     paidAt: order.paidAt || null,
   };
 }
@@ -186,14 +204,19 @@ export async function getAllShops(options?: { includeUnapproved?: boolean }) {
   const shops = snapshot.docs.map((doc) => normalizeShop(mapDoc<Shop>(doc.id, doc.data())));
   return options?.includeUnapproved
     ? shops
-    : shops.filter((shop) => shop.approvalStatus === "approved");
+    : shops.filter(
+        (shop) => shop.approvalStatus === "approved" && canShopReceiveOnlinePayments(shop),
+      );
 }
 
 export async function getShopById(shopId: string, options?: { includeUnapproved?: boolean }) {
   const snapshot = await adminDb().collection("shops").doc(shopId).get();
   if (!snapshot.exists) return null;
   const shop = normalizeShop(mapDoc<Shop>(snapshot.id, snapshot.data() ?? {}));
-  if (!options?.includeUnapproved && shop.approvalStatus !== "approved") {
+  if (
+    !options?.includeUnapproved &&
+    (shop.approvalStatus !== "approved" || !canShopReceiveOnlinePayments(shop))
+  ) {
     return null;
   }
   return shop;
@@ -424,6 +447,48 @@ export async function updateShopApproval(params: {
   return getShopById(params.shopId, { includeUnapproved: true });
 }
 
+export async function updateShopRouteDetails(params: {
+  shopId: string;
+  razorpayLinkedAccountId?: string;
+  razorpayLinkedAccountStatus?: string;
+  razorpayStakeholderId?: string;
+  razorpayProductId?: string;
+  razorpayProductStatus?: string;
+  bankAccountHolderName?: string;
+  bankIfsc?: string;
+  bankAccountLast4?: string;
+}) {
+  await adminDb().collection("shops").doc(params.shopId).set(
+    {
+      ...(params.razorpayLinkedAccountId !== undefined
+        ? { razorpayLinkedAccountId: String(params.razorpayLinkedAccountId || "").trim() }
+        : {}),
+      ...(params.razorpayLinkedAccountStatus !== undefined
+        ? { razorpayLinkedAccountStatus: String(params.razorpayLinkedAccountStatus || "").trim() }
+        : {}),
+      ...(params.razorpayStakeholderId !== undefined
+        ? { razorpayStakeholderId: String(params.razorpayStakeholderId || "").trim() }
+        : {}),
+      ...(params.razorpayProductId !== undefined
+        ? { razorpayProductId: String(params.razorpayProductId || "").trim() }
+        : {}),
+      ...(params.razorpayProductStatus !== undefined
+        ? { razorpayProductStatus: String(params.razorpayProductStatus || "").trim() }
+        : {}),
+      ...(params.bankAccountHolderName !== undefined
+        ? { bankAccountHolderName: String(params.bankAccountHolderName || "").trim() }
+        : {}),
+      ...(params.bankIfsc !== undefined ? { bankIfsc: String(params.bankIfsc || "").trim() } : {}),
+      ...(params.bankAccountLast4 !== undefined
+        ? { bankAccountLast4: String(params.bankAccountLast4 || "").trim() }
+        : {}),
+    },
+    { merge: true },
+  );
+
+  return getShopById(params.shopId, { includeUnapproved: true });
+}
+
 export async function createOrderWithFiles(params: {
   customerId: string;
   shopId: string;
@@ -482,16 +547,21 @@ export async function createOrderWithFiles(params: {
     copies: params.copies,
     finalAmount: null,
     paymentStatus: "unpaid",
+    paymentIntentStatus: "idle",
+    paymentAttemptAmountPaise: null,
     razorpayOrderId: null,
     razorpayPaymentId: null,
     platformCommissionPaise: null,
     platformTransactionFeePaise: null,
     estimatedFeePaise: null,
     estimatedTaxPaise: null,
+    gatewayFeeSource: null,
     transferableAmountPaise: null,
     transferId: null,
     transferStatus: "not_created",
     linkedAccountId: null,
+    refundId: null,
+    refundedAmountPaise: null,
     paidAt: null,
     status: "pending",
     createdAt,
@@ -609,40 +679,157 @@ export async function updateOrderStatus(
   status: OrderStatus,
   finalAmount?: number | null,
 ) {
-  await adminDb()
-    .collection("orders")
-    .doc(orderId)
-    .set(
+  const ref = adminDb().collection("orders").doc(orderId);
+
+  await adminDb().runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(ref);
+
+    if (!snapshot.exists) {
+      throw new Error("Order not found.");
+    }
+
+    const data = snapshot.data() ?? {};
+    const paymentStatus = String(data.paymentStatus || "unpaid");
+    const existingFinalAmount =
+      data.finalAmount === null || data.finalAmount === undefined ? null : Number(data.finalAmount);
+    const nextFinalAmount =
+      finalAmount === undefined || finalAmount === null ? null : Number(finalAmount);
+    const hasExistingPaymentIntent =
+      paymentStatus === "unpaid" &&
+      Boolean(data.razorpayOrderId) &&
+      String(data.paymentIntentStatus || "idle") !== "idle";
+    const amountChanged =
+      nextFinalAmount !== null &&
+      (existingFinalAmount === null || Math.round(existingFinalAmount * 100) !== Math.round(nextFinalAmount * 100));
+
+    if (hasExistingPaymentIntent && amountChanged) {
+      throw new Error(
+        "Payment has already been initiated for this order. Create a new order flow only after resolving the existing payment attempt.",
+      );
+    }
+
+    transaction.set(
+      ref,
       {
         status,
         ...(finalAmount !== undefined ? { finalAmount } : {}),
       },
       { merge: true },
     );
+  });
+
   return getOrderById(orderId);
 }
 
-export async function prepareOrderPayment(params: {
+export async function beginOrderPaymentIntent(params: {
+  orderId: string;
+  amountPaise: number;
+}) {
+  const ref = adminDb().collection("orders").doc(params.orderId);
+
+  return adminDb().runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(ref);
+
+    if (!snapshot.exists) {
+      throw new Error("Order not found.");
+    }
+
+    const data = snapshot.data() ?? {};
+    const paymentStatus = String(data.paymentStatus || "unpaid");
+    const paymentIntentStatus = String(data.paymentIntentStatus || "idle");
+    const existingAmount =
+      data.paymentAttemptAmountPaise === null || data.paymentAttemptAmountPaise === undefined
+        ? null
+        : Number(data.paymentAttemptAmountPaise);
+    const existingOrderId = String(data.razorpayOrderId || "");
+
+    if (paymentStatus === "paid") {
+      return {
+        action: "paid" as const,
+        razorpayOrderId: existingOrderId || null,
+        amountPaise: existingAmount,
+      };
+    }
+
+    if (
+      existingOrderId &&
+      paymentIntentStatus !== "creating" &&
+      (existingAmount === null || existingAmount === params.amountPaise)
+    ) {
+      return {
+        action: "reuse" as const,
+        razorpayOrderId: existingOrderId,
+        amountPaise: existingAmount ?? params.amountPaise,
+      };
+    }
+
+    if (paymentIntentStatus === "creating") {
+      return {
+        action: "creating" as const,
+        razorpayOrderId: existingOrderId || null,
+        amountPaise: existingAmount,
+      };
+    }
+
+    transaction.set(
+      ref,
+      {
+        paymentStatus: "unpaid",
+        paymentIntentStatus: "creating",
+        paymentAttemptAmountPaise: params.amountPaise,
+        razorpayOrderId: null,
+        razorpayPaymentId: null,
+        platformCommissionPaise: null,
+        platformTransactionFeePaise: null,
+        estimatedFeePaise: null,
+        estimatedTaxPaise: null,
+        gatewayFeeSource: null,
+        transferableAmountPaise: null,
+        transferId: null,
+        transferStatus: "not_created",
+        linkedAccountId: null,
+        refundId: null,
+        refundedAmountPaise: null,
+        paidAt: null,
+      },
+      { merge: true },
+    );
+
+    return {
+      action: "create" as const,
+      razorpayOrderId: null,
+      amountPaise: params.amountPaise,
+    };
+  });
+}
+
+export async function finalizeOrderPaymentIntent(params: {
   orderId: string;
   razorpayOrderId: string;
+  amountPaise: number;
 }) {
   await adminDb().collection("orders").doc(params.orderId).set(
     {
       razorpayOrderId: params.razorpayOrderId,
+      paymentIntentStatus: "ready",
+      paymentAttemptAmountPaise: params.amountPaise,
       paymentStatus: "unpaid",
-      platformCommissionPaise: null,
-      platformTransactionFeePaise: null,
-      estimatedFeePaise: null,
-      estimatedTaxPaise: null,
-      transferableAmountPaise: null,
-      transferId: null,
-      transferStatus: "not_created",
-      linkedAccountId: null,
     },
     { merge: true },
   );
 
   return getOrderById(params.orderId);
+}
+
+export async function failOrderPaymentIntent(orderId: string) {
+  await adminDb().collection("orders").doc(orderId).set(
+    {
+      paymentIntentStatus: "idle",
+    },
+    { merge: true },
+  );
+
+  return getOrderById(orderId);
 }
 
 export async function markOrderPaid(params: {
@@ -653,9 +840,12 @@ export async function markOrderPaid(params: {
   await adminDb().collection("orders").doc(params.orderId).set(
     {
       paymentStatus: "paid",
+      paymentIntentStatus: "ready",
       razorpayOrderId: params.razorpayOrderId,
       razorpayPaymentId: params.razorpayPaymentId,
       paidAt: FieldValue.serverTimestamp(),
+      refundId: null,
+      refundedAmountPaise: null,
     },
     { merge: true },
   );
@@ -669,6 +859,7 @@ export async function updateOrderTransferSnapshot(params: {
   platformTransactionFeePaise: number;
   estimatedFeePaise: number;
   estimatedTaxPaise: number;
+  gatewayFeeSource: Order["gatewayFeeSource"];
   transferableAmountPaise: number;
 }) {
   await adminDb().collection("orders").doc(params.orderId).set(
@@ -677,6 +868,7 @@ export async function updateOrderTransferSnapshot(params: {
       platformTransactionFeePaise: params.platformTransactionFeePaise,
       estimatedFeePaise: params.estimatedFeePaise,
       estimatedTaxPaise: params.estimatedTaxPaise,
+      gatewayFeeSource: params.gatewayFeeSource ?? null,
       transferableAmountPaise: params.transferableAmountPaise,
     },
     { merge: true },
@@ -701,6 +893,24 @@ export async function updateOrderTransferState(params: {
   return getOrderById(params.orderId);
 }
 
+export async function updateOrderRefundState(params: {
+  orderId: string;
+  paymentStatus: Order["paymentStatus"];
+  refundId?: string | null;
+  refundedAmountPaise?: number | null;
+}) {
+  await adminDb().collection("orders").doc(params.orderId).set(
+    {
+      paymentStatus: params.paymentStatus,
+      refundId: params.refundId ?? null,
+      refundedAmountPaise: params.refundedAmountPaise ?? null,
+    },
+    { merge: true },
+  );
+
+  return getOrderById(params.orderId);
+}
+
 export async function claimOrderTransferCreation(orderId: string) {
   const ref = adminDb().collection("orders").doc(orderId);
 
@@ -714,7 +924,13 @@ export async function claimOrderTransferCreation(orderId: string) {
     const data = snapshot.data() ?? {};
     const transferStatus = String(data.transferStatus || "not_created");
 
-    if (data.transferId || transferStatus === "processing" || transferStatus === "success") {
+    if (
+      data.transferId ||
+      transferStatus === "processing" ||
+      transferStatus === "success" ||
+      transferStatus === "reversed" ||
+      transferStatus === "partially_reversed"
+    ) {
       return false;
     }
 
@@ -728,6 +944,37 @@ export async function claimOrderTransferCreation(orderId: string) {
 
     return true;
   });
+}
+
+export async function getOrdersNeedingTransferAttention() {
+  const snapshot = await adminDb()
+    .collection("orders")
+    .where("paymentStatus", "in", ["paid", "refund_pending", "refund_failed", "refunded"])
+    .get();
+
+  const orders = snapshot.docs
+    .map((doc) => normalizeOrder(mapDoc<Order>(doc.id, doc.data() ?? {})))
+    .filter(
+      (order) =>
+        order.transferStatus === "failed" ||
+        order.transferStatus === "processing" ||
+        order.transferStatus === "pending" ||
+        order.paymentStatus === "refund_pending" ||
+        order.paymentStatus === "refund_failed" ||
+        (order.paymentStatus === "refunded" && order.transferStatus !== "reversed"),
+    )
+    .sort((a, b) => {
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bTime - aTime;
+    });
+
+  const filesByOrderId = await getFilesByOrderIds(orders.map((order) => order.id));
+
+  return orders.map((order) => ({
+    ...order,
+    files: filesByOrderId[order.id] ?? [],
+  })) as OrderWithFiles[];
 }
 
 export async function getOrderByPaymentId(paymentId: string) {

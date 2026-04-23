@@ -3,16 +3,14 @@ import { requireApiAdmin } from "@/lib/auth/admin";
 import { getOrderById } from "@/lib/firebase/firestore-admin";
 import { ensureOrderTransfer } from "@/lib/payments/transfers";
 
-export async function POST(request: Request) {
+export async function POST(
+  _request: Request,
+  context: RouteContext<"/api/admin/orders/[orderId]/retry-transfer">,
+) {
   try {
     await requireApiAdmin();
-    const { orderId } = await request.json();
-
-    if (!orderId) {
-      return NextResponse.json({ error: "Order is required." }, { status: 400 });
-    }
-
-    const order = await getOrderById(String(orderId));
+    const { orderId } = await context.params;
+    const order = await getOrderById(orderId);
 
     if (!order) {
       return NextResponse.json({ error: "Order not found." }, { status: 404 });
@@ -22,7 +20,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ order: updatedOrder });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to create transfer." },
+      { error: error instanceof Error ? error.message : "Unable to retry transfer." },
       { status: 400 },
     );
   }

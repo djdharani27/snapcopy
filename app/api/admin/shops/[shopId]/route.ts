@@ -5,8 +5,8 @@ import {
   deleteShopWithRelatedData,
   getShopById,
   updateShopApproval,
+  updateShopRouteDetails,
 } from "@/lib/firebase/firestore-admin";
-import { approveShopAndRunRouteOnboarding } from "@/lib/shops/route-onboarding";
 
 export async function PATCH(
   request: Request,
@@ -15,7 +15,8 @@ export async function PATCH(
   try {
     await requireApiAdmin();
     const { shopId } = await context.params;
-    const { action } = await request.json();
+    const body = await request.json();
+    const { action } = body;
     const shop = await getShopById(shopId, { includeUnapproved: true });
 
     if (!shop) {
@@ -23,7 +24,10 @@ export async function PATCH(
     }
 
     if (action === "approve") {
-      const approvedShop = await approveShopAndRunRouteOnboarding(shop);
+      const approvedShop = await updateShopApproval({
+        shopId: shop.id,
+        approvalStatus: "approved",
+      });
       return NextResponse.json({ shop: approvedShop });
     }
 
@@ -35,10 +39,22 @@ export async function PATCH(
       return NextResponse.json({ shop: rejectedShop });
     }
 
-    return NextResponse.json({ error: "Invalid admin action." }, { status: 400 });
+    const updatedShop = await updateShopRouteDetails({
+      shopId: shop.id,
+      razorpayLinkedAccountId: body.razorpayLinkedAccountId,
+      razorpayLinkedAccountStatus: body.razorpayLinkedAccountStatus,
+      razorpayStakeholderId: body.razorpayStakeholderId,
+      razorpayProductId: body.razorpayProductId,
+      razorpayProductStatus: body.razorpayProductStatus,
+      bankAccountHolderName: body.bankAccountHolderName,
+      bankIfsc: body.bankIfsc,
+      bankAccountLast4: body.bankAccountLast4,
+    });
+
+    return NextResponse.json({ shop: updatedShop });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to update approval." },
+      { error: error instanceof Error ? error.message : "Unable to update shop." },
       { status: 400 },
     );
   }

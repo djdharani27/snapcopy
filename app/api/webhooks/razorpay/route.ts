@@ -6,6 +6,7 @@ import {
   hasProcessedWebhookEvent,
   markOrderPaid,
   markWebhookEventProcessed,
+  updateOrderRefundState,
   updateOrderTransferState,
 } from "@/lib/firebase/firestore-admin";
 import { verifyRazorpayWebhookSignature } from "@/lib/payments/razorpay";
@@ -16,6 +17,7 @@ export const runtime = "nodejs";
 function mapTransferStatus(eventName: string) {
   if (eventName === "transfer.processed") return "success" as const;
   if (eventName === "transfer.failed") return "failed" as const;
+  if (eventName === "transfer.reversed") return "reversed" as const;
   return "pending" as const;
 }
 
@@ -55,6 +57,14 @@ export async function POST(request: Request) {
           status?: string;
         };
       };
+      refund?: {
+        entity?: {
+          id: string;
+          payment_id?: string | null;
+          amount?: number | null;
+          status?: string | null;
+        };
+      };
     };
   };
 
@@ -83,7 +93,11 @@ export async function POST(request: Request) {
       }
     }
 
-    if (payload.event === "transfer.processed" || payload.event === "transfer.failed") {
+    if (
+      payload.event === "transfer.processed" ||
+      payload.event === "transfer.failed" ||
+      payload.event === "transfer.reversed"
+    ) {
       const transferEntity = payload.payload?.transfer?.entity;
 
       if (transferEntity?.id) {
@@ -94,6 +108,34 @@ export async function POST(request: Request) {
             orderId: order.id,
             transferId: transferEntity.id,
             transferStatus: mapTransferStatus(payload.event),
+          });
+        }
+      }
+    }
+
+    if (
+      payload.event === "refund.created" ||
+      payload.event === "refund.processed" ||
+      payload.event === "refund.failed"
+    ) {
+      const refundEntity = payload.payload?.refund?.entity;
+
+      if (refundEntity?.payment_id) {
+        const order = await getOrderByPaymentId(refundEntity.payment_id);
+
+        if (order) {
+          const nextPaymentStatus =
+            payload.event === "refund.failed"
+              ? "refund_failed"
+              : payload.event === "refund.processed"
+                ? "refunded"
+                : "refund_pending";
+
+          await updateOrderRefundState({
+            orderId: order.id,
+            paymentStatus: nextPaymentStatus,
+            refundId: refundEntity.id,
+            refundedAmountPaise: refundEntity.amount ?? null,
           });
         }
       }
