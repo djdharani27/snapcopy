@@ -162,6 +162,7 @@ export async function createRazorpayLinkedAccount(params: {
   contactName: string;
   referenceId: string;
   address: string;
+  addressLine2?: string;
   city: string;
   state: string;
   postalCode: string;
@@ -196,6 +197,7 @@ export async function createRazorpayLinkedAccount(params: {
         addresses: {
           registered: {
             street1: params.address,
+            street2: params.addressLine2 || params.address,
             city: params.city,
             state: params.state.toUpperCase(),
             postal_code: params.postalCode,
