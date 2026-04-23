@@ -172,6 +172,8 @@ export async function createRazorpayLinkedAccount(params: {
   description?: string;
   pan?: string;
 }) {
+  const businessType = (params.businessType || "proprietorship").trim().toLowerCase();
+
   const response = await fetch("https://api.razorpay.com/v2/accounts", {
     method: "POST",
     headers: {
@@ -185,7 +187,7 @@ export async function createRazorpayLinkedAccount(params: {
       reference_id: params.referenceId,
       legal_business_name: params.legalBusinessName,
       customer_facing_business_name: params.legalBusinessName,
-      business_type: params.businessType || "proprietorship",
+      business_type: businessType,
       contact_name: params.contactName,
       profile: {
         category: params.businessCategory || process.env.RAZORPAY_ROUTE_BUSINESS_CATEGORY || "other_services",
@@ -205,7 +207,7 @@ export async function createRazorpayLinkedAccount(params: {
           },
         },
       },
-      ...(params.pan
+      ...(params.pan && businessType !== "proprietorship"
         ? {
             legal_info: {
               pan: params.pan,
