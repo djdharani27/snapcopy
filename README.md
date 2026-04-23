@@ -70,12 +70,16 @@ Use a Firebase service account from your project settings. Keep the private key 
 - `NEXT_PUBLIC_RAZORPAY_KEY_ID`
 - `RAZORPAY_KEY_SECRET`
 - `RAZORPAY_WEBHOOK_SECRET`
+- `RAZORPAY_ROUTE_BUSINESS_CATEGORY`
+- `RAZORPAY_ROUTE_BUSINESS_SUBCATEGORY`
 - `PLATFORM_TRANSACTION_FEE_PAISE`
 - `PLATFORM_SHOP_CREATION_FEE_PAISE`
 - `RAZORPAY_ESTIMATED_FEE_PERCENT`
 - `RAZORPAY_ESTIMATED_GST_PERCENT`
 
 Each shop owner needs a Razorpay Route Linked Account. The app creates one during shop setup using the shop details entered in the onboarding form. Platform billing values are stored in Firestore under `platform_settings/billing`, and these env vars only act as fallbacks.
+
+For Route onboarding, Razorpay requires `profile.category` and `profile.subcategory` to be a valid documented pair. Set `RAZORPAY_ROUTE_BUSINESS_CATEGORY` and `RAZORPAY_ROUTE_BUSINESS_SUBCATEGORY` to the exact values approved for your business in the Razorpay Route/KYC docs.
 
 For live cutover, point `NEXT_PUBLIC_RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` at your live credentials, and set `RAZORPAY_WEBHOOK_SECRET` to the webhook secret from the same live Razorpay account. If you keep both test and live credentials in `.env.local`, Next.js supports `$VARIABLE` expansion so the active values can reference the live ones.
 

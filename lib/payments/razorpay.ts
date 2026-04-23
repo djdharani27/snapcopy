@@ -40,6 +40,24 @@ function getRazorpayWebhookSecret() {
   return process.env.RAZORPAY_WEBHOOK_SECRET as string;
 }
 
+function getRazorpayRouteBusinessProfile(params: {
+  businessCategory?: string;
+  businessSubcategory?: string;
+}) {
+  const category =
+    params.businessCategory?.trim() || process.env.RAZORPAY_ROUTE_BUSINESS_CATEGORY?.trim();
+  const subcategory =
+    params.businessSubcategory?.trim() || process.env.RAZORPAY_ROUTE_BUSINESS_SUBCATEGORY?.trim();
+
+  if (!category || !subcategory) {
+    throw new Error(
+      "Missing Razorpay Route business profile. Set RAZORPAY_ROUTE_BUSINESS_CATEGORY and RAZORPAY_ROUTE_BUSINESS_SUBCATEGORY to a valid Razorpay category/subcategory pair from the Route docs.",
+    );
+  }
+
+  return { category, subcategory };
+}
+
 function getRazorpayBasicAuthHeader() {
   return `Basic ${Buffer.from(
     `${getRazorpayKeyId()}:${getRazorpayKeySecret()}`,
@@ -173,6 +191,10 @@ export async function createRazorpayLinkedAccount(params: {
   pan?: string;
 }) {
   const businessType = (params.businessType || "proprietorship").trim().toLowerCase();
+  const businessProfile = getRazorpayRouteBusinessProfile({
+    businessCategory: params.businessCategory,
+    businessSubcategory: params.businessSubcategory,
+  });
 
   const response = await fetch("https://api.razorpay.com/v2/accounts", {
     method: "POST",
@@ -190,11 +212,8 @@ export async function createRazorpayLinkedAccount(params: {
       business_type: businessType,
       contact_name: params.contactName,
       profile: {
-        category: params.businessCategory || process.env.RAZORPAY_ROUTE_BUSINESS_CATEGORY || "other_services",
-        subcategory:
-          params.businessSubcategory ||
-          process.env.RAZORPAY_ROUTE_BUSINESS_SUBCATEGORY ||
-          "business_services",
+        category: businessProfile.category,
+        subcategory: businessProfile.subcategory,
         business_model: params.description || "Local print and document services",
         addresses: {
           registered: {
