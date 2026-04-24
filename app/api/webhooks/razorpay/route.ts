@@ -55,6 +55,12 @@ export async function POST(request: Request) {
         entity?: {
           id: string;
           status?: string;
+          source?: string;
+          recipient?: string;
+          notes?: {
+            orderId?: string;
+            shopId?: string;
+          };
         };
       };
       refund?: {
@@ -101,7 +107,17 @@ export async function POST(request: Request) {
       const transferEntity = payload.payload?.transfer?.entity;
 
       if (transferEntity?.id) {
-        const order = await getOrderByTransferId(transferEntity.id);
+        let order = await getOrderByTransferId(transferEntity.id);
+
+        if (!order && transferEntity.source) {
+          const matchedOrder = await getOrderByPaymentId(transferEntity.source);
+          if (
+            matchedOrder &&
+            (!transferEntity.notes?.orderId || transferEntity.notes.orderId === matchedOrder.id)
+          ) {
+            order = matchedOrder;
+          }
+        }
 
         if (order) {
           await updateOrderTransferState({

@@ -17,10 +17,12 @@ export function CustomerOrdersList({
   orders,
   shopsById,
   profile,
+  customerPlatformFeePaise,
 }: {
   orders: OrderWithFiles[];
   shopsById: Record<string, Shop>;
   profile: UserProfile;
+  customerPlatformFeePaise: number;
 }) {
   if (orders.length === 0) {
     return (
@@ -35,10 +37,13 @@ export function CustomerOrdersList({
       {orders.map((order) => {
         const shop = shopsById[order.shopId];
         const canAcceptOnlinePayment = canShopReceiveOnlinePayments(shop);
+        const payableAmount =
+          order.finalAmount !== null && order.finalAmount !== undefined
+            ? Number(order.finalAmount) + customerPlatformFeePaise / 100
+            : null;
         const shouldShowPaymentAction =
           order.status === "completed" &&
-          order.finalAmount !== null &&
-          order.finalAmount !== undefined &&
+          payableAmount !== null &&
           order.paymentStatus === "unpaid" &&
           canAcceptOnlinePayment;
 
@@ -112,19 +117,25 @@ export function CustomerOrdersList({
                 {shouldShowPaymentAction ? (
                   <PayOrderButton
                     orderId={order.id}
-                    amount={Number(order.finalAmount)}
+                    amount={payableAmount ?? 0}
                     customerName={profile.name}
                     email={profile.email}
                     phone={profile.phone}
                   />
                 ) : null}
+                {order.finalAmount !== null &&
+                order.finalAmount !== undefined &&
+                customerPlatformFeePaise > 0 ? (
+                  <p className="mt-2 text-sm text-slate-500">
+                    Platform fee: {formatCurrency(customerPlatformFeePaise / 100)}
+                  </p>
+                ) : null}
                 {!canAcceptOnlinePayment &&
                 order.status === "completed" &&
-                order.finalAmount !== null &&
-                order.finalAmount !== undefined &&
+                payableAmount !== null &&
                 order.paymentStatus === "unpaid" ? (
                   <div className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
-                    {getShopPaymentUnavailableMessage()}
+                    {getShopPaymentUnavailableMessage(shop)}
                   </div>
                 ) : null}
                 {order.paymentStatus === "paid" ? (

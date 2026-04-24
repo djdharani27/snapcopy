@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { RouteOnboardingStatusCard } from "@/components/shop-owner/route-onboarding-status-card";
 import type { Shop, UserProfile } from "@/types";
 
 export function ShopSetupForm({
@@ -14,7 +15,6 @@ export function ShopSetupForm({
   const hydrationSafeProps = { suppressHydrationWarning: true as const };
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [syncingStatus, setSyncingStatus] = useState(false);
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const approvalStatus = shop?.approvalStatus || null;
@@ -79,32 +79,6 @@ export function ShopSetupForm({
     }
   }
 
-  async function handleSyncStatus() {
-    setSyncingStatus(true);
-    setError("");
-    setStatusMessage("");
-
-    try {
-      const response = await fetch("/api/shops/sync-status", {
-        method: "POST",
-      });
-
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error || "Unable to sync Razorpay status.");
-      }
-
-      setStatusMessage("Razorpay status synced.");
-      router.refresh();
-    } catch (syncError) {
-      setError(
-        syncError instanceof Error ? syncError.message : "Unable to sync Razorpay status.",
-      );
-    } finally {
-      setSyncingStatus(false);
-    }
-  }
-
   return (
     <form onSubmit={handleSubmit} className="panel-strong mx-auto max-w-4xl p-4 sm:p-6 lg:p-8">
       <div className="mb-6">
@@ -120,8 +94,8 @@ export function ShopSetupForm({
         </h1>
         <p className="mt-3 text-sm leading-7 text-slate-600">
           Set your shop details, services, settlement details, and base print prices. Admin
-          approval is required before customers can access the shop. Once approved, your shop can
-          keep accepting orders even if Razorpay online payout setup is still pending.
+          approval is required before customers can access the shop. Razorpay linked account and
+          Route product details are added manually by admins from the dashboard after approval.
         </p>
         <p className="mt-2 text-xs leading-6 text-slate-500">
           Razorpay linked account email: {profile.email || "missing email on your profile"}
@@ -137,6 +111,7 @@ export function ShopSetupForm({
             The last request was rejected. Review the details below and submit again.
           </div>
         ) : null}
+        {shop ? <div className="mt-5"><RouteOnboardingStatusCard shop={shop} compact /></div> : null}
       </div>
 
       <div className="grid gap-5 md:grid-cols-2">
@@ -272,24 +247,24 @@ export function ShopSetupForm({
               <p className="mt-2">
                 Bank: {shop?.bankIfsc || "-"} / xxxx{shop?.bankAccountLast4 || ""}
               </p>
-              <p className="mt-2 text-xs text-slate-500">
-                {isApproved
-                  ? "This shop is approved and can continue serving customers. After online payment verification, the server creates the Route transfer to this account."
-                  : "This linked account will receive Route payouts after onboarding is activated."}
-              </p>
+              {shop?.razorpayStatusLastSyncedAt ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  Last synced: {new Date(shop.razorpayStatusLastSyncedAt).toLocaleString()}
+                </p>
+              ) : null}
             </div>
           ) : null}
 
           <div className="mt-5 grid gap-5 md:grid-cols-2">
             <div className="md:col-span-2 rounded-[24px] border border-[#eadfd3] bg-[rgba(255,248,241,0.82)] p-4 text-sm text-slate-600">
               {hasLinkedAccount
-                ? "Update the payout details below and save to resubmit Razorpay Route onboarding for review."
-                : "Admin approval is required before Razorpay linked account onboarding runs. This affects online payouts, not whether the approved shop can fulfill orders."}
+                ? "Admin has already added Razorpay account details for this shop. Update the payout fields below if the admin asks you to correct bank or PAN information."
+                : "Admin approval is required before admins manually add the Razorpay linked account and Route product details. This affects online payouts, not whether the approved shop can fulfill orders."}
               {isApproved ? (
                 <>
                   <br />
-                  Your shop can stay live while customers pay offline until Route activation is
-                  complete.
+                  Your shop can stay live while customers pay offline until the admin completes the
+                  manual Route setup.
                 </>
               ) : null}
             </div>
@@ -370,24 +345,10 @@ export function ShopSetupForm({
                 {...hydrationSafeProps}
               />
               <span>
-                I accept the Razorpay Route onboarding and settlement terms for this shop owner
-                account.
+                I accept the Razorpay Route onboarding and settlement terms. Admin can use this
+                acceptance while configuring the shop manually in Razorpay.
               </span>
             </label>
-
-            {hasLinkedAccount ? (
-              <div className="md:col-span-2">
-                <button
-                  type="button"
-                  onClick={() => void handleSyncStatus()}
-                  disabled={syncingStatus}
-                  className="btn-secondary"
-                  {...hydrationSafeProps}
-                >
-                  {syncingStatus ? "Syncing..." : "Sync Razorpay status"}
-                </button>
-              </div>
-            ) : null}
           </div>
         </div>
 

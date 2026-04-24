@@ -69,13 +69,7 @@ export function calculateTransferBreakdown(params: {
     ? Number(params.actualTaxPaise)
     : Math.ceil((estimatedFeePaise * estimatedGstPercent) / 100);
   const gatewayFeeSource = hasActualGatewayFees ? "actual" : "estimated";
-  const transferableAmountPaise = Math.max(
-    0,
-    params.amountPaise -
-      platformTransactionFeePaise -
-      estimatedFeePaise -
-      estimatedTaxPaise,
-  );
+  const transferableAmountPaise = Math.max(0, params.amountPaise - platformTransactionFeePaise);
 
   return {
     platformTransactionFeePaise,

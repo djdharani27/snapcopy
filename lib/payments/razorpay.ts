@@ -78,6 +78,12 @@ export async function createRazorpayOrder(params: {
   amountInPaise: number;
   receipt: string;
   notes?: Record<string, string>;
+  transfers?: Array<{
+    accountId: string;
+    amountInPaise: number;
+    notes?: Record<string, string>;
+    linkedAccountNotes?: string[];
+  }>;
 }) {
   const response = await fetch("https://api.razorpay.com/v1/orders", {
     method: "POST",
@@ -89,7 +95,21 @@ export async function createRazorpayOrder(params: {
       amount: params.amountInPaise,
       currency: "INR",
       receipt: params.receipt,
+      partial_payment: false,
       notes: params.notes,
+      ...(params.transfers?.length
+        ? {
+            transfers: params.transfers.map((transfer) => ({
+              account: transfer.accountId,
+              amount: transfer.amountInPaise,
+              currency: "INR",
+              notes: transfer.notes,
+              ...(transfer.linkedAccountNotes?.length
+                ? { linked_account_notes: transfer.linkedAccountNotes }
+                : {}),
+            })),
+          }
+        : {}),
     }),
   });
 
@@ -120,6 +140,27 @@ export async function fetchRazorpayPayment(paymentId: string) {
     fee: number | null;
     tax: number | null;
   }>(response, "Unable to fetch Razorpay payment.");
+}
+
+export async function fetchRazorpayPaymentTransfers(paymentId: string) {
+  const response = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}/transfers`, {
+    headers: {
+      Authorization: getRazorpayBasicAuthHeader(),
+      "Content-Type": "application/json",
+    },
+  });
+
+  return parseRazorpayResponse<{
+    items?: Array<{
+      id: string;
+      status: string;
+      recipient: string;
+      amount: number;
+      currency: string;
+      source: string;
+      notes?: Record<string, string>;
+    }>;
+  }>(response, "Unable to fetch Razorpay payment transfers.");
 }
 
 export async function createRazorpayPaymentTransfer(params: {
@@ -266,6 +307,10 @@ export async function fetchRazorpayLinkedAccount(accountId: string) {
     email: string;
     phone: string | number;
     reference_id?: string;
+    status_details?: {
+      reason?: string;
+      description?: string;
+    };
   }>(response, "Unable to fetch Razorpay linked account.");
 }
 
@@ -418,7 +463,13 @@ export async function fetchRazorpayRouteProductConfiguration(params: {
 
   return parseRazorpayResponse<{
     requested_configuration?: unknown;
-    active_configuration?: unknown;
+    active_configuration?: {
+      settlements?: {
+        account_number?: string;
+        ifsc_code?: string;
+        beneficiary_name?: string;
+      };
+    };
     requirements?: Array<{
       field_reference?: string;
       resolution_url?: string;
@@ -429,6 +480,10 @@ export async function fetchRazorpayRouteProductConfiguration(params: {
     product_name: "route" | "Route";
     activation_status: string;
     account_id: string;
+    tnc?: {
+      accepted?: boolean;
+      accepted_at?: number;
+    };
   }>(response, "Unable to fetch Razorpay Route product configuration.");
 }
 

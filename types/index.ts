@@ -69,6 +69,19 @@ export interface Shop {
   razorpayStakeholderId?: string;
   razorpayProductId?: string;
   razorpayProductStatus?: string;
+  razorpayLinkedAccountStatusReason?: string;
+  razorpayLinkedAccountStatusDescription?: string;
+  razorpayProductRequirements?: Array<{
+    fieldReference?: string;
+    resolutionUrl?: string;
+    reasonCode?: string;
+    status?: string;
+  }>;
+  razorpayOwnerPanStatus?: string;
+  razorpayBankVerificationStatus?: string;
+  razorpayRouteTermsAccepted?: boolean;
+  paymentBlockedReason?: string;
+  razorpayStatusLastSyncedAt?: string | null;
   bankAccountHolderName?: string;
   bankIfsc?: string;
   bankAccountLast4?: string;

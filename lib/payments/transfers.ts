@@ -1,11 +1,13 @@
 import {
-  claimOrderTransferCreation,
   getOrderById,
   getShopById,
   updateOrderTransferSnapshot,
   updateOrderTransferState,
 } from "@/lib/firebase/firestore-admin";
-import { createRazorpayPaymentTransfer, fetchRazorpayPayment } from "@/lib/payments/razorpay";
+import {
+  fetchRazorpayPayment,
+  fetchRazorpayPaymentTransfers,
+} from "@/lib/payments/razorpay";
 import { calculateTransferBreakdown } from "@/lib/payments/transfer-calculation";
 import { getBillingConfig } from "@/lib/platform/billing";
 
@@ -27,10 +29,6 @@ export async function ensureOrderTransfer(orderId: string) {
 
   if (!order) {
     throw new Error("Order not found.");
-  }
-
-  if (order.transferId || order.transferStatus === "success") {
-    return order;
   }
 
   if (order.paymentStatus !== "paid" || !order.razorpayPaymentId) {
@@ -65,16 +63,10 @@ export async function ensureOrderTransfer(orderId: string) {
   });
 
   await updateOrderTransferSnapshot({
-      orderId: order.id,
-      linkedAccountId: shop.razorpayLinkedAccountId,
-      ...breakdown,
+    orderId: order.id,
+    linkedAccountId: shop.razorpayLinkedAccountId,
+    ...breakdown,
   });
-
-  const claimed = await claimOrderTransferCreation(order.id);
-
-  if (!claimed) {
-    return getOrderById(order.id);
-  }
 
   if (breakdown.transferableAmountPaise === 0) {
     await updateOrderTransferState({
@@ -82,7 +74,7 @@ export async function ensureOrderTransfer(orderId: string) {
       transferStatus: "success",
     });
 
-    console.info("No transfer created because payout was fully consumed by configured fees", {
+    console.info("No seller transfer is required because the payout amount is zero", {
       orderId: order.id,
       paymentId: payment.id,
     });
@@ -91,40 +83,36 @@ export async function ensureOrderTransfer(orderId: string) {
   }
 
   try {
-    console.info("Razorpay payment verified; creating transfer", {
-      orderId: order.id,
-      paymentId: payment.id,
-    });
+    const transfers = await fetchRazorpayPaymentTransfers(payment.id);
+    const transfer = transfers.items?.find(
+      (item) => item.recipient === shop.razorpayLinkedAccountId,
+    );
 
-    const transfer = await createRazorpayPaymentTransfer({
-      paymentId: payment.id,
-      accountId: shop.razorpayLinkedAccountId,
-      amountInPaise: breakdown.transferableAmountPaise,
-      notes: {
+    if (transfer) {
+      await updateOrderTransferState({
         orderId: order.id,
-        shopId: order.shopId,
-      },
-      linkedAccountNotes: ["orderId", "shopId"],
-    });
+        transferId: transfer.id,
+        transferStatus: mapTransferStatus(transfer.status),
+      });
 
-    await updateOrderTransferState({
-      orderId: order.id,
-      transferId: transfer.id,
-      transferStatus: mapTransferStatus(transfer.status),
-    });
-
-    console.info("Razorpay transfer created", {
-      orderId: order.id,
-      transferId: transfer.id,
-      transferStatus: transfer.status,
-    });
+      console.info("Synced Razorpay Route transfer from payment", {
+        orderId: order.id,
+        transferId: transfer.id,
+        transferStatus: transfer.status,
+      });
+    } else if (!order.transferId || order.transferStatus === "not_created") {
+      await updateOrderTransferState({
+        orderId: order.id,
+        transferStatus: "processing",
+      });
+    }
   } catch (error) {
     await updateOrderTransferState({
       orderId: order.id,
       transferStatus: "failed",
     });
 
-    console.error("Razorpay transfer failed", {
+    console.error("Razorpay Route transfer sync failed", {
       orderId: order.id,
       paymentId: order.razorpayPaymentId,
       error: error instanceof Error ? error.message : error,

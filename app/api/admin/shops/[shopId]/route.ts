@@ -4,7 +4,6 @@ import { deleteS3Objects } from "@/lib/aws/s3";
 import {
   deleteShopWithRelatedData,
   getShopById,
-  updateShopApproval,
   updateShopRouteDetails,
 } from "@/lib/firebase/firestore-admin";
 import { approveShopAndRunRouteOnboarding } from "@/lib/shops/route-onboarding";

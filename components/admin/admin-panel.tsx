@@ -408,22 +408,21 @@ export function AdminPanel({
           <p className="text-sm text-slate-500">Billing settings</p>
           <h2 className="mt-2 text-xl font-semibold text-slate-900">Payout billing</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            These values explain what the platform charges customers, what it charges shop owners,
-            and what commission is retained from each paid order. Rupees are edited here, while the
-            backend stores billing amounts in paise.
+            These values control the manual split the platform keeps on each paid order. Rupees are
+            edited here, while the backend stores billing amounts in paise.
           </p>
         </div>
 
         <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm text-slate-500">Customer platform fee</p>
-            <p className="mt-2 text-xl font-semibold text-slate-900">
-              {formatCurrency(customerPlatformFeeRupees)}/order
-            </p>
-            <p className="mt-2 text-xs leading-5 text-slate-500">
-              Customers are not charged any separate platform fee right now. They only pay the
-              final amount set by the shop.
-            </p>
+              <p className="mt-2 text-xl font-semibold text-slate-900">
+                {formatCurrency(customerPlatformFeeRupees)}/order
+              </p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+              Customer pricing is controlled by the platform commission below and is applied during
+              manual Route-based split payouts.
+              </p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm text-slate-500">Shop owner setup fee</p>
@@ -443,9 +442,9 @@ export function AdminPanel({
                 ? `${formatCurrency(formatPaiseToRupees(billing.transactionFeePaise))}/order`
                 : "Disabled"}
             </p>
-            <p className="mt-2 text-xs leading-5 text-slate-500">
-              Flat commission retained by the platform from each paid order before payout.
-            </p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+              Flat platform amount retained from each paid order before the shop payout is settled.
+              </p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm text-slate-500">Estimated gateway fee</p>
@@ -959,8 +958,9 @@ export function AdminPanel({
           <p className="text-sm text-slate-500">Approval queue</p>
           <h2 className="mt-2 text-xl font-semibold text-slate-900">Pending shop requests</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Shop-owner submissions stay blocked here until an admin approves them. Approval triggers
-            the Route onboarding API flow.
+            Shop-owner submissions stay blocked here until an admin approves them. After approval,
+            admins manually add the linked account, stakeholder, Route product, and payout status
+            details here before online payments are allowed.
           </p>
         </div>
 
@@ -1030,6 +1030,20 @@ export function AdminPanel({
                   />
                   <input
                     className="input"
+                    placeholder="Stakeholder id"
+                    value={shopRouteForms[shop.id]?.razorpayStakeholderId || ""}
+                    onChange={(event) =>
+                      setShopRouteForms((current) => ({
+                        ...current,
+                        [shop.id]: {
+                          ...current[shop.id],
+                          razorpayStakeholderId: event.target.value,
+                        },
+                      }))
+                    }
+                  />
+                  <input
+                    className="input"
                     placeholder="Route product id"
                     value={shopRouteForms[shop.id]?.razorpayProductId || ""}
                     onChange={(event) =>
@@ -1056,6 +1070,53 @@ export function AdminPanel({
                       }))
                     }
                   />
+                  <input
+                    className="input"
+                    placeholder="Bank account holder name"
+                    value={shopRouteForms[shop.id]?.bankAccountHolderName || ""}
+                    onChange={(event) =>
+                      setShopRouteForms((current) => ({
+                        ...current,
+                        [shop.id]: {
+                          ...current[shop.id],
+                          bankAccountHolderName: event.target.value,
+                        },
+                      }))
+                    }
+                  />
+                  <input
+                    className="input"
+                    placeholder="Bank IFSC"
+                    value={shopRouteForms[shop.id]?.bankIfsc || ""}
+                    onChange={(event) =>
+                      setShopRouteForms((current) => ({
+                        ...current,
+                        [shop.id]: {
+                          ...current[shop.id],
+                          bankIfsc: event.target.value,
+                        },
+                      }))
+                    }
+                  />
+                  <input
+                    className="input md:col-span-2"
+                    placeholder="Bank account last 4"
+                    value={shopRouteForms[shop.id]?.bankAccountLast4 || ""}
+                    onChange={(event) =>
+                      setShopRouteForms((current) => ({
+                        ...current,
+                        [shop.id]: {
+                          ...current[shop.id],
+                          bankAccountLast4: event.target.value,
+                        },
+                      }))
+                    }
+                  />
+                </div>
+                <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                  Approval only unlocks the shop record. Online payments stay blocked until an
+                  admin fills the manual Razorpay Route details here and sets the Route product
+                  status to <span className="font-semibold text-slate-900">activated</span>.
                 </div>
                 <div className="mt-4 flex flex-wrap gap-3">
                   <button
@@ -1163,6 +1224,20 @@ export function AdminPanel({
                     />
                     <input
                       className="input text-sm"
+                      placeholder="Stakeholder id"
+                      value={shopRouteForms[shop.id]?.razorpayStakeholderId || ""}
+                      onChange={(event) =>
+                        setShopRouteForms((current) => ({
+                          ...current,
+                          [shop.id]: {
+                            ...current[shop.id],
+                            razorpayStakeholderId: event.target.value,
+                          },
+                        }))
+                      }
+                    />
+                    <input
+                      className="input text-sm"
                       placeholder="Route product id"
                       value={shopRouteForms[shop.id]?.razorpayProductId || ""}
                       onChange={(event) =>
@@ -1189,7 +1264,54 @@ export function AdminPanel({
                         }))
                       }
                     />
+                    <input
+                      className="input text-sm"
+                      placeholder="Bank account holder name"
+                      value={shopRouteForms[shop.id]?.bankAccountHolderName || ""}
+                      onChange={(event) =>
+                        setShopRouteForms((current) => ({
+                          ...current,
+                          [shop.id]: {
+                            ...current[shop.id],
+                            bankAccountHolderName: event.target.value,
+                          },
+                        }))
+                      }
+                    />
+                    <input
+                      className="input text-sm"
+                      placeholder="Bank IFSC"
+                      value={shopRouteForms[shop.id]?.bankIfsc || ""}
+                      onChange={(event) =>
+                        setShopRouteForms((current) => ({
+                          ...current,
+                          [shop.id]: {
+                            ...current[shop.id],
+                            bankIfsc: event.target.value,
+                          },
+                        }))
+                      }
+                    />
+                    <input
+                      className="input text-sm md:col-span-2"
+                      placeholder="Bank account last 4"
+                      value={shopRouteForms[shop.id]?.bankAccountLast4 || ""}
+                      onChange={(event) =>
+                        setShopRouteForms((current) => ({
+                          ...current,
+                          [shop.id]: {
+                            ...current[shop.id],
+                            bankAccountLast4: event.target.value,
+                          },
+                        }))
+                      }
+                    />
                   </div>
+                  <p className="mt-3 text-xs leading-5 text-slate-500">
+                    This section is the source of truth for manual Route setup. Online payment only
+                    unlocks after the linked account and Route product are saved here with
+                    `activated` statuses.
+                  </p>
                 </div>
                 <div className="flex w-full flex-col gap-3 md:w-auto">
                   <button

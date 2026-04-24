@@ -11,7 +11,9 @@ import {
   canShopReceiveOnlinePayments,
   getShopPaymentUnavailableMessage,
 } from "@/lib/payments/shop-readiness";
+import { calculateTransferBreakdown } from "@/lib/payments/transfer-calculation";
 import { createRazorpayOrder, getRazorpayKeyId } from "@/lib/payments/razorpay";
+import { getBillingConfig } from "@/lib/platform/billing";
 
 export async function POST(request: Request) {
   try {
@@ -54,12 +56,17 @@ export async function POST(request: Request) {
 
     if (!canShopReceiveOnlinePayments(shop)) {
       return NextResponse.json(
-        { error: getShopPaymentUnavailableMessage() },
+        { error: getShopPaymentUnavailableMessage(shop) },
         { status: 400 },
       );
     }
 
-    const amountInPaise = Math.round(order.finalAmount * 100);
+    const billingConfig = await getBillingConfig();
+    const sellerAmountPaise = Math.round(order.finalAmount * 100);
+    const customerPlatformFeePaise = billingConfig.transactionFeeEnabled
+      ? billingConfig.transactionFeePaise
+      : 0;
+    const amountInPaise = sellerAmountPaise + customerPlatformFeePaise;
     const paymentIntent = await beginOrderPaymentIntent({
       orderId: order.id,
       amountPaise: amountInPaise,
@@ -89,6 +96,14 @@ export async function POST(request: Request) {
     let razorpayOrder;
 
     try {
+      const breakdown = calculateTransferBreakdown({
+        amountPaise: amountInPaise,
+        transactionFeePaise: billingConfig.transactionFeePaise,
+        estimatedRazorpayFeePercent: billingConfig.estimatedRazorpayFeePercent,
+        estimatedGstPercent: billingConfig.estimatedGstPercent,
+        transactionFeeEnabled: billingConfig.transactionFeeEnabled,
+      });
+
       razorpayOrder = await createRazorpayOrder({
         amountInPaise,
         receipt: `snapcopy-${order.id}`,
@@ -97,6 +112,21 @@ export async function POST(request: Request) {
           shopId: order.shopId,
           customerId: order.customerId,
         },
+        ...(breakdown.transferableAmountPaise > 0
+          ? {
+              transfers: [
+                {
+                  accountId: shop.razorpayLinkedAccountId!,
+                  amountInPaise: breakdown.transferableAmountPaise,
+                  notes: {
+                    orderId: order.id,
+                    shopId: order.shopId,
+                  },
+                  linkedAccountNotes: ["orderId", "shopId"],
+                },
+              ],
+            }
+          : {}),
       });
 
       await finalizeOrderPaymentIntent({

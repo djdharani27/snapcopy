@@ -1,6 +1,5 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase/admin";
-import { canShopReceiveOnlinePayments } from "@/lib/payments/shop-readiness";
 import type {
   Order,
   OrderFile,
@@ -49,6 +48,7 @@ function mapDoc<T>(id: string, data: FirebaseFirestore.DocumentData) {
     rejectedAt: timestampToIso(data.rejectedAt),
     paidAt: timestampToIso(data.paidAt),
     downloadedAt: timestampToIso(data.downloadedAt),
+    razorpayStatusLastSyncedAt: timestampToIso(data.razorpayStatusLastSyncedAt),
   } as T;
 }
 
@@ -75,6 +75,21 @@ function normalizeShop(shop: Shop): Shop {
     razorpayStakeholderId: String(shop.razorpayStakeholderId || "").trim(),
     razorpayProductId: String(shop.razorpayProductId || "").trim(),
     razorpayProductStatus: String(shop.razorpayProductStatus || "").trim(),
+    razorpayLinkedAccountStatusReason: String(shop.razorpayLinkedAccountStatusReason || "").trim(),
+    razorpayLinkedAccountStatusDescription: String(shop.razorpayLinkedAccountStatusDescription || "").trim(),
+    razorpayProductRequirements: Array.isArray(shop.razorpayProductRequirements)
+      ? shop.razorpayProductRequirements.map((requirement) => ({
+          fieldReference: String(requirement?.fieldReference || "").trim(),
+          resolutionUrl: String(requirement?.resolutionUrl || "").trim(),
+          reasonCode: String(requirement?.reasonCode || "").trim(),
+          status: String(requirement?.status || "").trim(),
+        }))
+      : [],
+    razorpayOwnerPanStatus: String(shop.razorpayOwnerPanStatus || "").trim(),
+    razorpayBankVerificationStatus: String(shop.razorpayBankVerificationStatus || "").trim(),
+    razorpayRouteTermsAccepted: Boolean(shop.razorpayRouteTermsAccepted),
+    paymentBlockedReason: String(shop.paymentBlockedReason || "").trim(),
+    razorpayStatusLastSyncedAt: shop.razorpayStatusLastSyncedAt || null,
     bankAccountHolderName: String(shop.bankAccountHolderName || "").trim(),
     bankIfsc: String(shop.bankIfsc || "").trim(),
     bankAccountLast4: String(shop.bankAccountLast4 || "").trim(),
@@ -204,19 +219,14 @@ export async function getAllShops(options?: { includeUnapproved?: boolean }) {
   const shops = snapshot.docs.map((doc) => normalizeShop(mapDoc<Shop>(doc.id, doc.data())));
   return options?.includeUnapproved
     ? shops
-    : shops.filter(
-        (shop) => shop.approvalStatus === "approved" && canShopReceiveOnlinePayments(shop),
-      );
+    : shops.filter((shop) => shop.approvalStatus === "approved");
 }
 
 export async function getShopById(shopId: string, options?: { includeUnapproved?: boolean }) {
   const snapshot = await adminDb().collection("shops").doc(shopId).get();
   if (!snapshot.exists) return null;
   const shop = normalizeShop(mapDoc<Shop>(snapshot.id, snapshot.data() ?? {}));
-  if (
-    !options?.includeUnapproved &&
-    (shop.approvalStatus !== "approved" || !canShopReceiveOnlinePayments(shop))
-  ) {
+  if (!options?.includeUnapproved && shop.approvalStatus !== "approved") {
     return null;
   }
   return shop;
@@ -251,6 +261,14 @@ export async function createShop(params: {
   razorpayStakeholderId?: string;
   razorpayProductId?: string;
   razorpayProductStatus?: string;
+  razorpayLinkedAccountStatusReason?: string;
+  razorpayLinkedAccountStatusDescription?: string;
+  razorpayProductRequirements?: Shop["razorpayProductRequirements"];
+  razorpayOwnerPanStatus?: string;
+  razorpayBankVerificationStatus?: string;
+  razorpayRouteTermsAccepted?: boolean;
+  paymentBlockedReason?: string;
+  razorpayStatusLastSyncedAt?: string | null;
   bankAccountHolderName?: string;
   bankIfsc?: string;
   bankAccountLast4?: string;
@@ -287,6 +305,14 @@ export async function createShop(params: {
     razorpayStakeholderId: params.razorpayStakeholderId || "",
     razorpayProductId: params.razorpayProductId || "",
     razorpayProductStatus: params.razorpayProductStatus || "",
+    razorpayLinkedAccountStatusReason: params.razorpayLinkedAccountStatusReason || "",
+    razorpayLinkedAccountStatusDescription: params.razorpayLinkedAccountStatusDescription || "",
+    razorpayProductRequirements: params.razorpayProductRequirements || [],
+    razorpayOwnerPanStatus: params.razorpayOwnerPanStatus || "",
+    razorpayBankVerificationStatus: params.razorpayBankVerificationStatus || "",
+    razorpayRouteTermsAccepted: Boolean(params.razorpayRouteTermsAccepted),
+    paymentBlockedReason: params.paymentBlockedReason || "",
+    razorpayStatusLastSyncedAt: params.razorpayStatusLastSyncedAt || null,
     bankAccountHolderName: params.bankAccountHolderName || "",
     bankIfsc: params.bankIfsc || "",
     bankAccountLast4: params.bankAccountLast4 || "",
@@ -318,6 +344,14 @@ export async function updateShop(params: {
   razorpayStakeholderId?: string;
   razorpayProductId?: string;
   razorpayProductStatus?: string;
+  razorpayLinkedAccountStatusReason?: string;
+  razorpayLinkedAccountStatusDescription?: string;
+  razorpayProductRequirements?: Shop["razorpayProductRequirements"];
+  razorpayOwnerPanStatus?: string;
+  razorpayBankVerificationStatus?: string;
+  razorpayRouteTermsAccepted?: boolean;
+  paymentBlockedReason?: string;
+  razorpayStatusLastSyncedAt?: string | null;
   bankAccountHolderName?: string;
   bankIfsc?: string;
   bankAccountLast4?: string;
@@ -354,6 +388,14 @@ export async function updateShop(params: {
       razorpayStakeholderId: params.razorpayStakeholderId || "",
       razorpayProductId: params.razorpayProductId || "",
       razorpayProductStatus: params.razorpayProductStatus || "",
+      razorpayLinkedAccountStatusReason: params.razorpayLinkedAccountStatusReason || "",
+      razorpayLinkedAccountStatusDescription: params.razorpayLinkedAccountStatusDescription || "",
+      razorpayProductRequirements: params.razorpayProductRequirements || [],
+      razorpayOwnerPanStatus: params.razorpayOwnerPanStatus || "",
+      razorpayBankVerificationStatus: params.razorpayBankVerificationStatus || "",
+      razorpayRouteTermsAccepted: Boolean(params.razorpayRouteTermsAccepted),
+      paymentBlockedReason: params.paymentBlockedReason || "",
+      razorpayStatusLastSyncedAt: params.razorpayStatusLastSyncedAt || null,
       bankAccountHolderName: params.bankAccountHolderName || "",
       bankIfsc: params.bankIfsc || "",
       bankAccountLast4: params.bankAccountLast4 || "",
@@ -372,6 +414,13 @@ export async function updateShopRazorpayStatus(params: {
   shopId: string;
   razorpayLinkedAccountStatus?: string;
   razorpayProductStatus?: string;
+  razorpayLinkedAccountStatusReason?: string;
+  razorpayLinkedAccountStatusDescription?: string;
+  razorpayProductRequirements?: Shop["razorpayProductRequirements"];
+  razorpayOwnerPanStatus?: string;
+  razorpayBankVerificationStatus?: string;
+  razorpayRouteTermsAccepted?: boolean;
+  paymentBlockedReason?: string;
 }) {
   await adminDb().collection("shops").doc(params.shopId).set(
     {
@@ -381,6 +430,28 @@ export async function updateShopRazorpayStatus(params: {
       ...(params.razorpayProductStatus !== undefined
         ? { razorpayProductStatus: params.razorpayProductStatus }
         : {}),
+      ...(params.razorpayLinkedAccountStatusReason !== undefined
+        ? { razorpayLinkedAccountStatusReason: params.razorpayLinkedAccountStatusReason }
+        : {}),
+      ...(params.razorpayLinkedAccountStatusDescription !== undefined
+        ? { razorpayLinkedAccountStatusDescription: params.razorpayLinkedAccountStatusDescription }
+        : {}),
+      ...(params.razorpayProductRequirements !== undefined
+        ? { razorpayProductRequirements: params.razorpayProductRequirements }
+        : {}),
+      ...(params.razorpayOwnerPanStatus !== undefined
+        ? { razorpayOwnerPanStatus: params.razorpayOwnerPanStatus }
+        : {}),
+      ...(params.razorpayBankVerificationStatus !== undefined
+        ? { razorpayBankVerificationStatus: params.razorpayBankVerificationStatus }
+        : {}),
+      ...(params.razorpayRouteTermsAccepted !== undefined
+        ? { razorpayRouteTermsAccepted: params.razorpayRouteTermsAccepted }
+        : {}),
+      ...(params.paymentBlockedReason !== undefined
+        ? { paymentBlockedReason: params.paymentBlockedReason }
+        : {}),
+      razorpayStatusLastSyncedAt: FieldValue.serverTimestamp(),
     },
     { merge: true },
   );
@@ -396,6 +467,13 @@ export async function updateShopApproval(params: {
   razorpayStakeholderId?: string;
   razorpayProductId?: string;
   razorpayProductStatus?: string;
+  razorpayLinkedAccountStatusReason?: string;
+  razorpayLinkedAccountStatusDescription?: string;
+  razorpayProductRequirements?: Shop["razorpayProductRequirements"];
+  razorpayOwnerPanStatus?: string;
+  razorpayBankVerificationStatus?: string;
+  razorpayRouteTermsAccepted?: boolean;
+  paymentBlockedReason?: string;
   bankAccountHolderName?: string;
   bankIfsc?: string;
   bankAccountLast4?: string;
@@ -428,6 +506,27 @@ export async function updateShopApproval(params: {
       ...(params.razorpayProductStatus !== undefined
         ? { razorpayProductStatus: params.razorpayProductStatus }
         : {}),
+      ...(params.razorpayLinkedAccountStatusReason !== undefined
+        ? { razorpayLinkedAccountStatusReason: params.razorpayLinkedAccountStatusReason }
+        : {}),
+      ...(params.razorpayLinkedAccountStatusDescription !== undefined
+        ? { razorpayLinkedAccountStatusDescription: params.razorpayLinkedAccountStatusDescription }
+        : {}),
+      ...(params.razorpayProductRequirements !== undefined
+        ? { razorpayProductRequirements: params.razorpayProductRequirements }
+        : {}),
+      ...(params.razorpayOwnerPanStatus !== undefined
+        ? { razorpayOwnerPanStatus: params.razorpayOwnerPanStatus }
+        : {}),
+      ...(params.razorpayBankVerificationStatus !== undefined
+        ? { razorpayBankVerificationStatus: params.razorpayBankVerificationStatus }
+        : {}),
+      ...(params.razorpayRouteTermsAccepted !== undefined
+        ? { razorpayRouteTermsAccepted: params.razorpayRouteTermsAccepted }
+        : {}),
+      ...(params.paymentBlockedReason !== undefined
+        ? { paymentBlockedReason: params.paymentBlockedReason }
+        : {}),
       ...(params.bankAccountHolderName !== undefined
         ? { bankAccountHolderName: params.bankAccountHolderName }
         : {}),
@@ -438,6 +537,7 @@ export async function updateShopApproval(params: {
             pendingBankAccountNumber: "",
             pendingOwnerPan: "",
             pendingRouteTermsAccepted: false,
+            razorpayStatusLastSyncedAt: FieldValue.serverTimestamp(),
           }
         : {}),
     },
@@ -454,6 +554,13 @@ export async function updateShopRouteDetails(params: {
   razorpayStakeholderId?: string;
   razorpayProductId?: string;
   razorpayProductStatus?: string;
+  razorpayLinkedAccountStatusReason?: string;
+  razorpayLinkedAccountStatusDescription?: string;
+  razorpayProductRequirements?: Shop["razorpayProductRequirements"];
+  razorpayOwnerPanStatus?: string;
+  razorpayBankVerificationStatus?: string;
+  razorpayRouteTermsAccepted?: boolean;
+  paymentBlockedReason?: string;
   bankAccountHolderName?: string;
   bankIfsc?: string;
   bankAccountLast4?: string;
@@ -475,12 +582,57 @@ export async function updateShopRouteDetails(params: {
       ...(params.razorpayProductStatus !== undefined
         ? { razorpayProductStatus: String(params.razorpayProductStatus || "").trim() }
         : {}),
+      ...(params.razorpayLinkedAccountStatusReason !== undefined
+        ? {
+            razorpayLinkedAccountStatusReason: String(
+              params.razorpayLinkedAccountStatusReason || "",
+            ).trim(),
+          }
+        : {}),
+      ...(params.razorpayLinkedAccountStatusDescription !== undefined
+        ? {
+            razorpayLinkedAccountStatusDescription: String(
+              params.razorpayLinkedAccountStatusDescription || "",
+            ).trim(),
+          }
+        : {}),
+      ...(params.razorpayProductRequirements !== undefined
+        ? {
+            razorpayProductRequirements: params.razorpayProductRequirements.map((requirement) => ({
+              fieldReference: String(requirement?.fieldReference || "").trim(),
+              resolutionUrl: String(requirement?.resolutionUrl || "").trim(),
+              reasonCode: String(requirement?.reasonCode || "").trim(),
+              status: String(requirement?.status || "").trim(),
+            })),
+          }
+        : {}),
+      ...(params.razorpayOwnerPanStatus !== undefined
+        ? { razorpayOwnerPanStatus: String(params.razorpayOwnerPanStatus || "").trim() }
+        : {}),
+      ...(params.razorpayBankVerificationStatus !== undefined
+        ? {
+            razorpayBankVerificationStatus: String(
+              params.razorpayBankVerificationStatus || "",
+            ).trim(),
+          }
+        : {}),
+      ...(params.razorpayRouteTermsAccepted !== undefined
+        ? { razorpayRouteTermsAccepted: Boolean(params.razorpayRouteTermsAccepted) }
+        : {}),
+      ...(params.paymentBlockedReason !== undefined
+        ? { paymentBlockedReason: String(params.paymentBlockedReason || "").trim() }
+        : {}),
       ...(params.bankAccountHolderName !== undefined
         ? { bankAccountHolderName: String(params.bankAccountHolderName || "").trim() }
         : {}),
       ...(params.bankIfsc !== undefined ? { bankIfsc: String(params.bankIfsc || "").trim() } : {}),
       ...(params.bankAccountLast4 !== undefined
         ? { bankAccountLast4: String(params.bankAccountLast4 || "").trim() }
+        : {}),
+      ...(params.razorpayProductRequirements !== undefined ||
+      params.razorpayLinkedAccountStatus !== undefined ||
+      params.razorpayProductStatus !== undefined
+        ? { razorpayStatusLastSyncedAt: FieldValue.serverTimestamp() }
         : {}),
     },
     { merge: true },

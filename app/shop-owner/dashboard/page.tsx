@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { RefreshButton } from "@/components/layout/refresh-button";
 import { AutoRefresh } from "@/components/shop-owner/auto-refresh";
 import { OrdersTable } from "@/components/shop-owner/orders-table";
+import { RouteOnboardingStatusCard } from "@/components/shop-owner/route-onboarding-status-card";
 import { ShopQrCard } from "@/components/shop-owner/shop-qr-card";
 import { ShopQrToggle } from "@/components/shop-owner/shop-qr-toggle";
 import { ShopOwnerNav } from "@/components/shop-owner/shop-owner-nav";
@@ -57,6 +58,7 @@ export default async function ShopOwnerDashboardPage() {
       }
     >
       <AutoRefresh shopId={shop.id} />
+      <RouteOnboardingStatusCard shop={shop} />
       <ShopQrToggle>
         <ShopQrCard shopId={shop.id} />
       </ShopQrToggle>
