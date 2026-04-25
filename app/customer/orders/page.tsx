@@ -9,7 +9,6 @@ import {
   getOrdersForCustomer,
 } from "@/lib/firebase/firestore-admin";
 import { requireRole } from "@/lib/auth/session";
-import { getBillingConfig } from "@/lib/platform/billing";
 
 export default async function CustomerOrdersPage({
   searchParams,
@@ -20,10 +19,9 @@ export default async function CustomerOrdersPage({
 
   const { decoded, profile } = await requireRole("customer");
   const { order } = await searchParams;
-  const [shops, orders, billing] = await Promise.all([
+  const [shops, orders] = await Promise.all([
     getAllShops(),
     getOrdersForCustomer(decoded.uid),
-    getBillingConfig(),
   ]);
   const shopsById = Object.fromEntries(shops.map((shop) => [shop.id, shop]));
 
@@ -54,9 +52,6 @@ export default async function CustomerOrdersPage({
             orders={orders}
             shopsById={shopsById}
             profile={profile}
-            customerPlatformFeePaise={
-              billing.transactionFeeEnabled ? billing.transactionFeePaise : 0
-            }
           />
         </section>
       </div>

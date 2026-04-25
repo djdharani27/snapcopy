@@ -1,5 +1,19 @@
 import crypto from "crypto";
 
+function normalizeRazorpayPhone(value: string) {
+  const digits = String(value || "").replace(/\D/g, "");
+
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return digits.slice(2);
+  }
+
+  if (digits.length === 11 && digits.startsWith("0")) {
+    return digits.slice(1);
+  }
+
+  return digits;
+}
+
 function assertRazorpayEnv() {
   const required = {
     keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
@@ -64,6 +78,75 @@ function getRazorpayBasicAuthHeader() {
   ).toString("base64")}`;
 }
 
+function getRazorpayLogPayload(init?: RequestInit) {
+  if (!init?.body || typeof init.body !== "string") {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(init.body);
+
+    const redactSecrets = (value: unknown): unknown => {
+      if (Array.isArray(value)) {
+        return value.map(redactSecrets);
+      }
+
+      if (!value || typeof value !== "object") {
+        return value;
+      }
+
+      return Object.fromEntries(
+        Object.entries(value).map(([key, nestedValue]) => {
+          const normalizedKey = key.toLowerCase();
+
+          if (["account_number", "pan"].includes(normalizedKey)) {
+            return [key, "[REDACTED]"];
+          }
+
+          return [key, redactSecrets(nestedValue)];
+        }),
+      );
+    };
+
+    return redactSecrets(payload);
+  } catch {
+    return init.body;
+  }
+}
+
+async function razorpayApiFetch(path: string, init?: RequestInit) {
+  const method = init?.method || "GET";
+  const url = `https://api.razorpay.com${path}`;
+  const requestPayload = getRazorpayLogPayload(init);
+
+  console.info("[Razorpay API] Request", {
+    method,
+    url: path,
+    body: requestPayload,
+  });
+
+  const response = await fetch(url, init);
+  const responseClone = response.clone();
+  const responseText = await responseClone.text();
+  let responsePayload: unknown = responseText;
+
+  try {
+    responsePayload = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    responsePayload = responseText;
+  }
+
+  console.info("[Razorpay API] Response", {
+    method,
+    url: path,
+    status: response.status,
+    ok: response.ok,
+    body: responsePayload,
+  });
+
+  return response;
+}
+
 async function parseRazorpayResponse<T>(response: Response, fallbackMessage: string) {
   const payload = await response.json();
 
@@ -85,7 +168,7 @@ export async function createRazorpayOrder(params: {
     linkedAccountNotes?: string[];
   }>;
 }) {
-  const response = await fetch("https://api.razorpay.com/v1/orders", {
+  const response = await razorpayApiFetch("/v1/orders", {
     method: "POST",
     headers: {
       Authorization: getRazorpayBasicAuthHeader(),
@@ -123,7 +206,7 @@ export async function createRazorpayOrder(params: {
 }
 
 export async function fetchRazorpayPayment(paymentId: string) {
-  const response = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}`, {
+  const response = await razorpayApiFetch(`/v1/payments/${paymentId}`, {
     headers: {
       Authorization: getRazorpayBasicAuthHeader(),
       "Content-Type": "application/json",
@@ -143,7 +226,7 @@ export async function fetchRazorpayPayment(paymentId: string) {
 }
 
 export async function fetchRazorpayPaymentTransfers(paymentId: string) {
-  const response = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}/transfers`, {
+  const response = await razorpayApiFetch(`/v1/payments/${paymentId}/transfers`, {
     headers: {
       Authorization: getRazorpayBasicAuthHeader(),
       "Content-Type": "application/json",
@@ -170,29 +253,26 @@ export async function createRazorpayPaymentTransfer(params: {
   notes?: Record<string, string>;
   linkedAccountNotes?: string[];
 }) {
-  const response = await fetch(
-    `https://api.razorpay.com/v1/payments/${params.paymentId}/transfers`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: getRazorpayBasicAuthHeader(),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        transfers: [
-          {
-            account: params.accountId,
-            amount: params.amountInPaise,
-            currency: "INR",
-            notes: params.notes,
-            ...(params.linkedAccountNotes?.length
-              ? { linked_account_notes: params.linkedAccountNotes }
-              : {}),
-          },
-        ],
-      }),
+  const response = await razorpayApiFetch(`/v1/payments/${params.paymentId}/transfers`, {
+    method: "POST",
+    headers: {
+      Authorization: getRazorpayBasicAuthHeader(),
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify({
+      transfers: [
+        {
+          account: params.accountId,
+          amount: params.amountInPaise,
+          currency: "INR",
+          notes: params.notes,
+          ...(params.linkedAccountNotes?.length
+            ? { linked_account_notes: params.linkedAccountNotes }
+            : {}),
+        },
+      ],
+    }),
+  });
 
   const payload = await parseRazorpayResponse<{
     items?: Array<{
@@ -232,13 +312,16 @@ export async function createRazorpayLinkedAccount(params: {
   pan?: string;
 }) {
   const businessType = (params.businessType || "individual").trim().toLowerCase();
+  const normalizedPhone = normalizeRazorpayPhone(params.phone);
   const usesStakeholderPanOnly = ["individual", "proprietorship"].includes(businessType);
   const businessProfile = getRazorpayRouteBusinessProfile({
     businessCategory: params.businessCategory,
     businessSubcategory: params.businessSubcategory,
   });
 
-  const response = await fetch("https://api.razorpay.com/v2/accounts", {
+  console.log("Razorpay settlement email:", params.email);
+
+  const response = await razorpayApiFetch("/v2/accounts", {
     method: "POST",
     headers: {
       Authorization: getRazorpayBasicAuthHeader(),
@@ -246,7 +329,7 @@ export async function createRazorpayLinkedAccount(params: {
     },
     body: JSON.stringify({
       email: params.email,
-      phone: params.phone,
+      phone: Number(normalizedPhone),
       type: "route",
       reference_id: params.referenceId,
       legal_business_name: params.legalBusinessName,
@@ -289,11 +372,15 @@ export async function createRazorpayLinkedAccount(params: {
     business_type: string;
     legal_business_name: string;
     customer_facing_business_name?: string;
+    status_details?: {
+      reason?: string;
+      description?: string;
+    };
   }>(response, "Unable to create Razorpay linked account.");
 }
 
 export async function fetchRazorpayLinkedAccount(accountId: string) {
-  const response = await fetch(`https://api.razorpay.com/v2/accounts/${accountId}`, {
+  const response = await razorpayApiFetch(`/v2/accounts/${accountId}`, {
     headers: {
       Authorization: getRazorpayBasicAuthHeader(),
       "Content-Type": "application/json",
@@ -314,6 +401,61 @@ export async function fetchRazorpayLinkedAccount(accountId: string) {
   }>(response, "Unable to fetch Razorpay linked account.");
 }
 
+export async function updateRazorpayLinkedAccount(params: {
+  accountId: string;
+  phone: string;
+  legalBusinessName: string;
+  contactName: string;
+  address: string;
+  addressLine2?: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  description?: string;
+}) {
+  const normalizedPhone = normalizeRazorpayPhone(params.phone);
+
+  const response = await razorpayApiFetch(`/v2/accounts/${params.accountId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: getRazorpayBasicAuthHeader(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      phone: Number(normalizedPhone),
+      legal_business_name: params.legalBusinessName,
+      customer_facing_business_name: params.legalBusinessName,
+      contact_name: params.contactName,
+      profile: {
+        business_model: params.description || "Local print and document services",
+        addresses: {
+          registered: {
+            street1: params.address,
+            street2: params.addressLine2 || params.address,
+            city: params.city,
+            state: params.state.toUpperCase(),
+            postal_code: params.postalCode,
+            country: "IN",
+          },
+        },
+      },
+    }),
+  });
+
+  return parseRazorpayResponse<{
+    id: string;
+    type: "route";
+    status: string;
+    email: string;
+    phone: string | number;
+    reference_id?: string;
+    status_details?: {
+      reason?: string;
+      description?: string;
+    };
+  }>(response, "Unable to update Razorpay linked account.");
+}
+
 export async function createRazorpayStakeholder(params: {
   accountId: string;
   name: string;
@@ -325,40 +467,38 @@ export async function createRazorpayStakeholder(params: {
   state: string;
   postalCode: string;
 }) {
-  const response = await fetch(
-    `https://api.razorpay.com/v2/accounts/${params.accountId}/stakeholders`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: getRazorpayBasicAuthHeader(),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name: params.name,
-        email: params.email,
-        relationship: {
-          director: true,
-          executive: true,
-        },
-        percentage_ownership: 100,
-        phone: {
-          primary: Number(params.phone),
-        },
-        addresses: {
-          residential: {
-            street: params.address,
-            city: params.city,
-            state: params.state.toUpperCase(),
-            postal_code: params.postalCode,
-            country: "IN",
-          },
-        },
-        kyc: {
-          pan: params.pan,
-        },
-      }),
+  const normalizedPhone = normalizeRazorpayPhone(params.phone);
+  const response = await razorpayApiFetch(`/v2/accounts/${params.accountId}/stakeholders`, {
+    method: "POST",
+    headers: {
+      Authorization: getRazorpayBasicAuthHeader(),
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify({
+      name: params.name,
+      email: params.email,
+      relationship: {
+        director: true,
+        executive: true,
+      },
+      percentage_ownership: 100,
+      phone: {
+        primary: normalizedPhone,
+      },
+      addresses: {
+        residential: {
+          street: params.address,
+          city: params.city,
+          state: params.state.toUpperCase(),
+          postal_code: params.postalCode,
+          country: "IN",
+        },
+      },
+      kyc: {
+        pan: params.pan,
+      },
+    }),
+  });
 
   return parseRazorpayResponse<{
     id: string;
@@ -371,11 +511,57 @@ export async function createRazorpayStakeholder(params: {
   }>(response, "Unable to create Razorpay stakeholder.");
 }
 
+export async function fetchRazorpayStakeholder(params: {
+  accountId: string;
+  stakeholderId: string;
+}) {
+  const response = await razorpayApiFetch(
+    `/v2/accounts/${params.accountId}/stakeholders/${params.stakeholderId}`,
+    {
+      headers: {
+        Authorization: getRazorpayBasicAuthHeader(),
+        "Content-Type": "application/json",
+      },
+    },
+  );
+
+  return parseRazorpayResponse<{
+    id: string;
+    entity: "stakeholder";
+    name: string;
+    email: string;
+    kyc?: {
+      pan?: string;
+    };
+  }>(response, "Unable to fetch Razorpay stakeholder.");
+}
+
+export async function fetchAllRazorpayStakeholders(accountId: string) {
+  const response = await razorpayApiFetch(`/v2/accounts/${accountId}/stakeholders`, {
+    headers: {
+      Authorization: getRazorpayBasicAuthHeader(),
+      "Content-Type": "application/json",
+    },
+  });
+
+  return parseRazorpayResponse<{
+    items?: Array<{
+      id: string;
+      entity: "stakeholder";
+      name?: string;
+      email?: string;
+      kyc?: {
+        pan?: string;
+      };
+    }>;
+  }>(response, "Unable to fetch Razorpay stakeholders.");
+}
+
 export async function requestRazorpayRouteProductConfiguration(params: {
   accountId: string;
   tncAccepted: boolean;
 }) {
-  const response = await fetch(`https://api.razorpay.com/v2/accounts/${params.accountId}/products`, {
+  const response = await razorpayApiFetch(`/v2/accounts/${params.accountId}/products`, {
     method: "POST",
     headers: {
       Authorization: getRazorpayBasicAuthHeader(),
@@ -402,8 +588,39 @@ export async function updateRazorpayRouteProductConfiguration(params: {
   beneficiaryName: string;
   tncAccepted: boolean;
 }) {
-  const response = await fetch(
-    `https://api.razorpay.com/v2/accounts/${params.accountId}/products/${params.productId}`,
+  const sanitizedAccountNumber = String(params.accountNumber || "").replace(/\s/g, "");
+  const sanitizedIfscCode = String(params.ifscCode || "").trim().toUpperCase();
+  const sanitizedBeneficiaryName = String(params.beneficiaryName || "").trim();
+
+  if (!/^\d{5,20}$/.test(sanitizedAccountNumber)) {
+    throw new Error(
+      "Settlement bank account number is required before Route product configuration can be submitted.",
+    );
+  }
+
+  if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(sanitizedIfscCode)) {
+    throw new Error(
+      "Settlement IFSC is required before Route product configuration can be submitted.",
+    );
+  }
+
+  if (!sanitizedBeneficiaryName) {
+    throw new Error(
+      "Settlement beneficiary name is required before Route product configuration can be submitted.",
+    );
+  }
+
+  console.info("[Razorpay Route Product] Settlement config preflight", {
+    account_id: params.accountId,
+    product_id: params.productId,
+    has_beneficiary_name: Boolean(sanitizedBeneficiaryName),
+    has_ifsc_code: Boolean(sanitizedIfscCode),
+    has_full_account_number: Boolean(sanitizedAccountNumber),
+    account_number_last4: sanitizedAccountNumber.slice(-4),
+  });
+
+  const response = await razorpayApiFetch(
+    `/v2/accounts/${params.accountId}/products/${params.productId}`,
     {
       method: "PATCH",
       headers: {
@@ -412,9 +629,9 @@ export async function updateRazorpayRouteProductConfiguration(params: {
       },
       body: JSON.stringify({
         settlements: {
-          account_number: params.accountNumber,
-          ifsc_code: params.ifscCode,
-          beneficiary_name: params.beneficiaryName,
+          account_number: sanitizedAccountNumber,
+          ifsc_code: sanitizedIfscCode,
+          beneficiary_name: sanitizedBeneficiaryName,
         },
         tnc_accepted: params.tncAccepted,
       }),
@@ -451,8 +668,8 @@ export async function fetchRazorpayRouteProductConfiguration(params: {
   accountId: string;
   productId: string;
 }) {
-  const response = await fetch(
-    `https://api.razorpay.com/v2/accounts/${params.accountId}/products/${params.productId}`,
+  const response = await razorpayApiFetch(
+    `/v2/accounts/${params.accountId}/products/${params.productId}`,
     {
       headers: {
         Authorization: getRazorpayBasicAuthHeader(),

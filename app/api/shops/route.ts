@@ -8,6 +8,7 @@ import {
 } from "@/lib/firebase/firestore-admin";
 import {
   parseAcceptedTerms,
+  parseEmail,
   parseGoogleMapsUrl,
   parsePhone,
   parsePrice,
@@ -38,8 +39,10 @@ export async function POST(request: Request) {
       city,
       state,
       postalCode,
+      businessType,
       googleMapsUrl,
       phone,
+      settlementEmail,
       description,
       services,
       bankAccountHolderName,
@@ -70,6 +73,10 @@ export async function POST(request: Request) {
     const parsedState = parseRequiredText(state, "State");
     const parsedPostalCode = parsePostalCode(postalCode);
     const parsedPhone = parsePhone(phone);
+    const parsedSettlementEmail = parseEmail(
+      settlementEmail,
+      "Settlement email",
+    );
     const parsedBankAccountHolderName = parseRequiredText(
       bankAccountHolderName,
       "Bank account holder name",
@@ -93,8 +100,10 @@ export async function POST(request: Request) {
       city: parsedCity,
       state: parsedState,
       postalCode: parsedPostalCode,
+      businessType: String(businessType || "individual").trim().toLowerCase(),
       googleMapsUrl: parseGoogleMapsUrl(googleMapsUrl),
       phone: parsedPhone,
+      settlementEmail: parsedSettlementEmail,
       description: String(description || "").trim(),
       services: parseServices(services),
       razorpayLinkedAccountId: "",
@@ -135,8 +144,10 @@ export async function PATCH(request: Request) {
       city,
       state,
       postalCode,
+      businessType,
       googleMapsUrl,
       phone,
+      settlementEmail,
       description,
       services,
       bankAccountHolderName,
@@ -153,6 +164,10 @@ export async function PATCH(request: Request) {
     const parsedState = parseRequiredText(state, "State");
     const parsedPostalCode = parsePostalCode(postalCode);
     const parsedPhone = parsePhone(phone);
+    const parsedSettlementEmail = parseEmail(
+      settlementEmail,
+      "Settlement email",
+    );
 
     const parsedBankAccountHolderName = parseRequiredText(
       bankAccountHolderName,
@@ -178,8 +193,10 @@ export async function PATCH(request: Request) {
       city: parsedCity,
       state: parsedState,
       postalCode: parsedPostalCode,
+      businessType: String(businessType || existingShop.businessType || "individual").trim().toLowerCase(),
       googleMapsUrl: parseGoogleMapsUrl(googleMapsUrl),
       phone: parsedPhone,
+      settlementEmail: parsedSettlementEmail,
       description: String(description || "").trim(),
       services: parseServices(services),
       razorpayLinkedAccountId: String(existingShop.razorpayLinkedAccountId || "").trim(),

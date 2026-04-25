@@ -50,16 +50,25 @@ export function formatTrackingId(
 }
 
 export function statusLabel(status: OrderStatus) {
+  if (status === "confirmed") return "Confirmed";
+  if (status === "in_progress") return "In progress";
+  if (status === "ready_for_pickup") return "Ready for pickup";
   if (status === "completed") return "Completed";
-  return "Pending";
+  return "Pending payment";
 }
 
 export function customerStatusLabel(status: OrderStatus) {
-  if (status === "completed") return "Printed";
-  return "Order sent";
+  if (status === "confirmed") return "Payment received";
+  if (status === "in_progress") return "Printing in progress";
+  if (status === "ready_for_pickup") return "Ready for pickup";
+  if (status === "completed") return "Picked up";
+  return "Awaiting payment";
 }
 
 export function statusClassName(status: OrderStatus) {
+  if (status === "confirmed") return "status-processing";
+  if (status === "in_progress") return "status-processing";
+  if (status === "ready_for_pickup") return "status-completed";
   if (status === "completed") return "status-completed";
   return "status-pending";
 }

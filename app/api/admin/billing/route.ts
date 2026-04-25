@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ApiAuthError } from "@/lib/auth/errors";
 import { requireApiAdmin } from "@/lib/auth/admin";
 import {
   DEFAULT_BILLING_CONFIG,
@@ -26,22 +27,22 @@ function parsePercent(value: unknown, field: string) {
   return parsedValue;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    await requireApiAdmin();
+    await requireApiAdmin(request);
     const billing = await getBillingConfig();
     return NextResponse.json({ billing });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to load billing settings." },
-      { status: 400 },
+      { status: error instanceof ApiAuthError ? error.status : 400 },
     );
   }
 }
 
 export async function PATCH(request: Request) {
   try {
-    const decoded = await requireApiAdmin();
+    const { decoded } = await requireApiAdmin(request);
     const body = await request.json();
 
     const billing = await updateBillingConfig({
@@ -65,14 +66,14 @@ export async function PATCH(request: Request) {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to update billing settings." },
-      { status: 400 },
+      { status: error instanceof ApiAuthError ? error.status : 400 },
     );
   }
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
-    const decoded = await requireApiAdmin();
+    const { decoded } = await requireApiAdmin(request);
     const billing = await updateBillingConfig({
       actorUid: decoded.uid,
       actorEmail: decoded.email || "",
@@ -84,7 +85,7 @@ export async function POST() {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to reset billing settings." },
-      { status: 400 },
+      { status: error instanceof ApiAuthError ? error.status : 400 },
     );
   }
 }

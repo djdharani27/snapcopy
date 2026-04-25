@@ -28,6 +28,7 @@ export function UploadOrderForm({
   const [submittedShop, setSubmittedShop] = useState<Shop | null>(null);
   const [printType, setPrintType] = useState<"color" | "black_white">("black_white");
   const [sideType, setSideType] = useState<"single_side" | "double_side">("single_side");
+  const [pageCount, setPageCount] = useState(1);
   const [copies, setCopies] = useState(1);
   const [selectedShopId, setSelectedShopId] = useState(initialShopId || shops[0]?.id || "");
 
@@ -98,6 +99,7 @@ export function UploadOrderForm({
           notes: formData.get("notes"),
           printType: formData.get("printType"),
           sideType: formData.get("sideType"),
+          pageCount: Number(formData.get("pageCount")),
           copies: Number(formData.get("copies")),
           files: uploadResult.files,
         }),
@@ -112,6 +114,7 @@ export function UploadOrderForm({
       form.reset();
       setPrintType("black_white");
       setSideType("single_side");
+      setPageCount(1);
       setCopies(1);
       setSelectedShopId(initialShopId || shops[0]?.id || "");
       setCreatedTrackingCode(orderResult.order?.trackingCode || orderResult.order?.id || "");
@@ -274,6 +277,22 @@ export function UploadOrderForm({
             </div>
 
             <div>
+              <label className="label" htmlFor="pageCount">
+                Page count
+              </label>
+              <input
+                id="pageCount"
+                name="pageCount"
+                type="number"
+                min="1"
+                value={pageCount}
+                onChange={(event) => setPageCount(Number(event.target.value) || 1)}
+                className="input"
+                required
+              />
+            </div>
+
+            <div>
               <label className="label" htmlFor="copies">
                 Copies
               </label>
@@ -308,7 +327,7 @@ export function UploadOrderForm({
       {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
       <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-[#776b61]">
-          The shop receives your files right after submission.
+          The backend locks pricing from the shop&apos;s saved rate card before checkout.
         </p>
         <button
           type="submit"

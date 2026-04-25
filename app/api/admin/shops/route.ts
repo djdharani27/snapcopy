@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ApiAuthError } from "@/lib/auth/errors";
 import { requireApiAdmin } from "@/lib/auth/admin";
 import { createShop, getUserProfileById } from "@/lib/firebase/firestore-admin";
 import {
@@ -13,7 +14,7 @@ import {
 
 export async function POST(request: Request) {
   try {
-    await requireApiAdmin();
+    await requireApiAdmin(request);
     const {
       ownerId,
       shopName,
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to create shop." },
-      { status: 400 },
+      { status: error instanceof ApiAuthError ? error.status : 400 },
     );
   }
 }

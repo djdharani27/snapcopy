@@ -5,6 +5,11 @@ import {
   getShopById,
   upsertUserProfile,
 } from "@/lib/firebase/firestore-admin";
+import { calculatePrintOrderPricing } from "@/lib/payments/order-pricing";
+import {
+  canShopReceiveOnlinePayments,
+  getShopPaymentUnavailableMessage,
+} from "@/lib/payments/shop-readiness";
 import { PRINT_TYPES, SIDE_TYPES } from "@/lib/utils/constants";
 
 export async function POST(request: Request) {
@@ -17,6 +22,7 @@ export async function POST(request: Request) {
       notes,
       printType,
       sideType,
+      pageCount,
       copies,
       files,
     } = await request.json();
@@ -41,31 +47,42 @@ export async function POST(request: Request) {
     });
 
     if (!validFiles) {
-      return NextResponse.json(
-        { error: "Invalid uploaded file metadata." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Invalid uploaded file metadata." }, { status: 400 });
     }
 
     if (!PRINT_TYPES.includes(printType) || !SIDE_TYPES.includes(sideType)) {
-      return NextResponse.json(
-        { error: "Invalid print options." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Invalid print options." }, { status: 400 });
     }
 
     const numericCopies = Number(copies);
     if (!Number.isInteger(numericCopies) || numericCopies < 1) {
-      return NextResponse.json(
-        { error: "Copies must be at least 1." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Copies must be at least 1." }, { status: 400 });
+    }
+
+    const numericPageCount = Number(pageCount);
+    if (!Number.isInteger(numericPageCount) || numericPageCount < 1) {
+      return NextResponse.json({ error: "Page count must be at least 1." }, { status: 400 });
     }
 
     const shop = await getShopById(String(shopId));
     if (!shop) {
       return NextResponse.json({ error: "Shop not found." }, { status: 404 });
     }
+
+    if (!canShopReceiveOnlinePayments(shop)) {
+      return NextResponse.json(
+        { error: getShopPaymentUnavailableMessage(shop) },
+        { status: 400 },
+      );
+    }
+
+    const pricing = calculatePrintOrderPricing({
+      shop,
+      printType,
+      sideType,
+      pageCount: numericPageCount,
+      copies: numericCopies,
+    });
 
     await upsertUserProfile({
       uid: decoded.uid,
@@ -83,7 +100,9 @@ export async function POST(request: Request) {
       notes: String(notes || "").trim(),
       printType,
       sideType,
+      pageCount: numericPageCount,
       copies: numericCopies,
+      pricing,
       files,
     });
 

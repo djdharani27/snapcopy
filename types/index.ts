@@ -1,8 +1,21 @@
-export type UserRole = "customer" | "shop_owner";
+export type UserRole = "admin" | "customer" | "shop_owner";
 export type ShopApprovalStatus = "pending_approval" | "approved" | "rejected";
+export type ShopSubscriptionStatus = "inactive" | "active" | "expired";
 
-export type OrderStatus = "pending" | "completed";
-export type PaymentStatus = "unpaid" | "paid" | "refund_pending" | "refunded" | "refund_failed";
+export type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "in_progress"
+  | "ready_for_pickup"
+  | "completed";
+export type PaymentStatus =
+  | "unpaid"
+  | "payment_failed"
+  | "paid"
+  | "refund_pending"
+  | "refunded"
+  | "refund_failed";
+export type SettlementStatus = "pending" | "paid" | "failed";
 export type TransferStatus =
   | "not_created"
   | "pending"
@@ -11,7 +24,11 @@ export type TransferStatus =
   | "failed"
   | "reversed"
   | "partially_reversed";
-export type PaymentIntentStatus = "idle" | "creating" | "ready";
+export type PaymentIntentStatus =
+  | "idle"
+  | "creating"
+  | "ready"
+  | "payment_verified_client_return";
 export type GatewayFeeSource = "actual" | "estimated";
 
 export type PrintType = "color" | "black_white";
@@ -60,8 +77,10 @@ export interface Shop {
   city?: string;
   state?: string;
   postalCode?: string;
+  businessType?: string;
   googleMapsUrl?: string;
   phone: string;
+  settlementEmail?: string;
   description: string;
   services: string[];
   razorpayLinkedAccountId?: string;
@@ -69,6 +88,7 @@ export interface Shop {
   razorpayStakeholderId?: string;
   razorpayProductId?: string;
   razorpayProductStatus?: string;
+  razorpayProductResolutionUrl?: string;
   razorpayLinkedAccountStatusReason?: string;
   razorpayLinkedAccountStatusDescription?: string;
   razorpayProductRequirements?: Array<{
@@ -82,12 +102,19 @@ export interface Shop {
   razorpayRouteTermsAccepted?: boolean;
   paymentBlockedReason?: string;
   razorpayStatusLastSyncedAt?: string | null;
+  onboardingStep?: string;
+  onboardingError?: string;
   bankAccountHolderName?: string;
   bankIfsc?: string;
   bankAccountLast4?: string;
   pendingBankAccountNumber?: string;
   pendingOwnerPan?: string;
   pendingRouteTermsAccepted?: boolean;
+  subscriptionStatus?: ShopSubscriptionStatus;
+  subscriptionValidUntil?: string | null;
+  razorpaySubscriptionOrderId?: string | null;
+  razorpaySubscriptionPaymentId?: string | null;
+  isActive?: boolean;
   pricing: {
     blackWhiteSingle: number;
     blackWhiteDouble: number;
@@ -108,7 +135,12 @@ export interface Order {
   printType: PrintType;
   sideType: SideType;
   copies: number;
-  finalAmount?: number | null;
+  pageCount?: number | null;
+  printCostPaise?: number | null;
+  platformFeePaise?: number | null;
+  totalAmountPaise?: number | null;
+  shopEarningPaise?: number | null;
+  platformEarningPaise?: number | null;
   paymentStatus: PaymentStatus;
   paymentIntentStatus?: PaymentIntentStatus | null;
   paymentAttemptAmountPaise?: number | null;
@@ -122,12 +154,36 @@ export interface Order {
   transferableAmountPaise?: number | null;
   transferId?: string | null;
   transferStatus?: TransferStatus | null;
+  transferFailureReason?: string | null;
+  transferUpdatedAt?: string | null;
   linkedAccountId?: string | null;
+  settlementStatus?: SettlementStatus | null;
+  settlementPaidAt?: string | null;
   refundId?: string | null;
   refundedAmountPaise?: number | null;
   paidAt?: string | null;
   status: OrderStatus;
   createdAt?: string | null;
+}
+
+export interface ShopSubscriptionPayment {
+  id: string;
+  shopId: string;
+  amountPaise: number;
+  razorpayOrderId?: string | null;
+  razorpayPaymentId?: string | null;
+  status: PaymentStatus;
+  paidAt?: string | null;
+  createdAt?: string | null;
+}
+
+export interface RazorpayWebhookEvent {
+  id: string;
+  razorpayEventId: string;
+  eventType: string;
+  payloadJson?: string | null;
+  createdAt?: string | null;
+  processedAt?: string | null;
 }
 
 export interface OrderFile {

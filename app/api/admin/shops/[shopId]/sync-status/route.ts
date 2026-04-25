@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
-import { requireApiRole } from "@/lib/auth/session";
-import { getShopByOwnerId } from "@/lib/firebase/firestore-admin";
+import { ApiAuthError } from "@/lib/auth/errors";
+import { requireApiAdmin } from "@/lib/auth/admin";
+import { getShopById } from "@/lib/firebase/firestore-admin";
 import { syncShopRazorpayStatus } from "@/lib/shops/route-onboarding";
 
-export async function POST() {
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ shopId: string }> },
+) {
   try {
-    const { decoded } = await requireApiRole("shop_owner");
-    const shop = await getShopByOwnerId(decoded.uid);
+    await requireApiAdmin(request);
+    const { shopId } = await context.params;
+    const shop = await getShopById(shopId, { includeUnapproved: true });
 
     if (!shop) {
       return NextResponse.json({ error: "Shop not found." }, { status: 404 });
@@ -31,7 +36,7 @@ export async function POST() {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to sync Razorpay status." },
-      { status: 400 },
+      { status: error instanceof ApiAuthError ? error.status : 400 },
     );
   }
 }

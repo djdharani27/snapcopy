@@ -11,9 +11,7 @@ import {
   canShopReceiveOnlinePayments,
   getShopPaymentUnavailableMessage,
 } from "@/lib/payments/shop-readiness";
-import { calculateTransferBreakdown } from "@/lib/payments/transfer-calculation";
 import { createRazorpayOrder, getRazorpayKeyId } from "@/lib/payments/razorpay";
-import { getBillingConfig } from "@/lib/platform/billing";
 
 export async function POST(request: Request) {
   try {
@@ -30,18 +28,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Order not found." }, { status: 404 });
     }
 
-    if (order.status !== "completed") {
-      return NextResponse.json(
-        { error: "Payment is available only after the shop marks the order printed." },
-        { status: 400 },
-      );
-    }
-
-    if (!order.finalAmount || order.finalAmount <= 0) {
-      return NextResponse.json(
-        { error: "Final amount is not ready yet." },
-        { status: 400 },
-      );
+    if (!order.totalAmountPaise || order.totalAmountPaise <= 0 || !order.printCostPaise) {
+      return NextResponse.json({ error: "Trusted order pricing is missing." }, { status: 400 });
     }
 
     if (order.paymentStatus === "paid") {
@@ -61,12 +49,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const billingConfig = await getBillingConfig();
-    const sellerAmountPaise = Math.round(order.finalAmount * 100);
-    const customerPlatformFeePaise = billingConfig.transactionFeeEnabled
-      ? billingConfig.transactionFeePaise
-      : 0;
-    const amountInPaise = sellerAmountPaise + customerPlatformFeePaise;
+    if (!shop.razorpayLinkedAccountId) {
+      return NextResponse.json(
+        { error: "Shop linked account is missing." },
+        { status: 400 },
+      );
+    }
+
+    const amountInPaise = order.totalAmountPaise;
     const paymentIntent = await beginOrderPaymentIntent({
       orderId: order.id,
       amountPaise: amountInPaise,
@@ -89,75 +79,63 @@ export async function POST(request: Request) {
         amount: paymentIntent.amountPaise,
         currency: "INR",
         keyId: getRazorpayKeyId(),
+        pricing: {
+          printCostPaise: order.printCostPaise,
+          platformFeePaise: order.platformFeePaise,
+          totalAmountPaise: order.totalAmountPaise,
+        },
         order,
       });
     }
 
+    const receipt = `sc-ord-${order.id.slice(-24)}`;
     let razorpayOrder;
 
     try {
-      const breakdown = calculateTransferBreakdown({
-        amountPaise: amountInPaise,
-        transactionFeePaise: billingConfig.transactionFeePaise,
-        estimatedRazorpayFeePercent: billingConfig.estimatedRazorpayFeePercent,
-        estimatedGstPercent: billingConfig.estimatedGstPercent,
-        transactionFeeEnabled: billingConfig.transactionFeeEnabled,
-      });
-
       razorpayOrder = await createRazorpayOrder({
         amountInPaise,
-        receipt: `snapcopy-${order.id}`,
+        receipt,
         notes: {
           orderId: order.id,
           shopId: order.shopId,
           customerId: order.customerId,
+          pageCount: String(order.pageCount || 0),
+          copies: String(order.copies),
         },
-        ...(breakdown.transferableAmountPaise > 0
-          ? {
-              transfers: [
-                {
-                  accountId: shop.razorpayLinkedAccountId!,
-                  amountInPaise: breakdown.transferableAmountPaise,
-                  notes: {
-                    orderId: order.id,
-                    shopId: order.shopId,
-                  },
-                  linkedAccountNotes: ["orderId", "shopId"],
-                },
-              ],
-            }
-          : {}),
-      });
-
-      await finalizeOrderPaymentIntent({
-        orderId: order.id,
-        razorpayOrderId: razorpayOrder.id,
-        amountPaise: amountInPaise,
+        transfers: [
+          {
+            accountId: shop.razorpayLinkedAccountId,
+            amountInPaise: order.shopEarningPaise ?? amountInPaise,
+            notes: {
+              orderId: order.id,
+              shopId: order.shopId,
+            },
+          },
+        ],
       });
     } catch (error) {
-      if (razorpayOrder?.id) {
-        try {
-          await finalizeOrderPaymentIntent({
-            orderId: order.id,
-            razorpayOrderId: razorpayOrder.id,
-            amountPaise: amountInPaise,
-          });
-        } catch {
-          // Keep the original error and fall back to resetting the intent only if the remote
-          // order was never persisted locally.
-        }
-      } else {
-        await failOrderPaymentIntent(order.id);
-      }
-
+      await failOrderPaymentIntent(order.id);
       throw error;
     }
+
+    await finalizeOrderPaymentIntent({
+      orderId: order.id,
+      razorpayOrderId: razorpayOrder.id,
+      amountPaise: amountInPaise,
+      linkedAccountId: shop.razorpayLinkedAccountId,
+      transferableAmountPaise: order.shopEarningPaise ?? amountInPaise,
+    });
 
     return NextResponse.json({
       razorpayOrderId: razorpayOrder.id,
       amount: razorpayOrder.amount,
       currency: razorpayOrder.currency,
       keyId: getRazorpayKeyId(),
+      pricing: {
+        printCostPaise: order.printCostPaise,
+        platformFeePaise: order.platformFeePaise,
+        totalAmountPaise: order.totalAmountPaise,
+      },
       order,
     });
   } catch (error) {

@@ -1,8 +1,14 @@
 import type { OrderStatus, SideType, PrintType, UserRole, PaymentStatus } from "@/types";
 
 export const USER_ROLES: UserRole[] = ["customer", "shop_owner"];
-export const ORDER_STATUSES: OrderStatus[] = ["pending", "completed"];
-export const PAYMENT_STATUSES: PaymentStatus[] = ["unpaid", "paid"];
+export const ORDER_STATUSES: OrderStatus[] = [
+  "pending",
+  "confirmed",
+  "in_progress",
+  "ready_for_pickup",
+  "completed",
+];
+export const PAYMENT_STATUSES: PaymentStatus[] = ["unpaid", "payment_failed", "paid"];
 export const PRINT_TYPES: PrintType[] = ["color", "black_white"];
 export const SIDE_TYPES: SideType[] = ["single_side", "double_side"];
 
@@ -17,3 +23,4 @@ export const ACCEPTED_FILE_TYPES = [
 export const ACCEPTED_FILE_EXTENSIONS = ".pdf,.doc,.docx,.png,.jpg,.jpeg";
 export const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024;
 export const MAX_FILES_PER_ORDER = 10;
+export const SNAPCOPY_PLATFORM_FEE_PAISE = 0;

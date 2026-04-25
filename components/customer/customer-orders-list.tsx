@@ -17,12 +17,10 @@ export function CustomerOrdersList({
   orders,
   shopsById,
   profile,
-  customerPlatformFeePaise,
 }: {
   orders: OrderWithFiles[];
   shopsById: Record<string, Shop>;
   profile: UserProfile;
-  customerPlatformFeePaise: number;
 }) {
   if (orders.length === 0) {
     return (
@@ -38,13 +36,13 @@ export function CustomerOrdersList({
         const shop = shopsById[order.shopId];
         const canAcceptOnlinePayment = canShopReceiveOnlinePayments(shop);
         const payableAmount =
-          order.finalAmount !== null && order.finalAmount !== undefined
-            ? Number(order.finalAmount) + customerPlatformFeePaise / 100
+          order.totalAmountPaise !== null && order.totalAmountPaise !== undefined
+            ? Number(order.totalAmountPaise) / 100
             : null;
         const shouldShowPaymentAction =
-          order.status === "completed" &&
+          order.status === "pending" &&
           payableAmount !== null &&
-          order.paymentStatus === "unpaid" &&
+          (order.paymentStatus === "unpaid" || order.paymentStatus === "payment_failed") &&
           canAcceptOnlinePayment;
 
         return (
@@ -89,7 +87,7 @@ export function CustomerOrdersList({
                 <p className="mt-3 text-sm text-slate-600">
                   {order.printType === "color" ? "Color" : "Black & white"} |{" "}
                   {order.sideType === "double_side" ? "Double side" : "Single side"} |{" "}
-                  {order.copies} copies
+                  {order.pageCount || 0} pages | {order.copies} copies
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {order.files.map((file) => (
@@ -104,15 +102,15 @@ export function CustomerOrdersList({
               </div>
 
               <div className="w-full rounded-[24px] bg-[rgba(255,247,239,0.95)] p-4 text-left md:min-w-56 md:w-auto md:text-right">
-                {order.finalAmount !== null && order.finalAmount !== undefined ? (
+                {order.printCostPaise !== null && order.printCostPaise !== undefined ? (
                   <>
-                    <p className="text-sm text-slate-500">Final amount</p>
+                    <p className="text-sm text-slate-500">Print cost</p>
                     <p className="mt-2 text-xl font-semibold text-slate-900">
-                      {formatCurrency(order.finalAmount)}
+                      {formatCurrency(order.printCostPaise / 100)}
                     </p>
                   </>
                 ) : (
-                  <p className="text-sm text-slate-500">Awaiting final amount</p>
+                  <p className="text-sm text-slate-500">Awaiting trusted print cost</p>
                 )}
                 {shouldShowPaymentAction ? (
                   <PayOrderButton
@@ -123,19 +121,29 @@ export function CustomerOrdersList({
                     phone={profile.phone}
                   />
                 ) : null}
-                {order.finalAmount !== null &&
-                order.finalAmount !== undefined &&
-                customerPlatformFeePaise > 0 ? (
+                {order.platformFeePaise !== null &&
+                order.platformFeePaise !== undefined &&
+                order.platformFeePaise > 0 ? (
                   <p className="mt-2 text-sm text-slate-500">
-                    Platform fee: {formatCurrency(customerPlatformFeePaise / 100)}
+                    Platform fee: {formatCurrency(order.platformFeePaise / 100)}
+                  </p>
+                ) : null}
+                {order.totalAmountPaise !== null && order.totalAmountPaise !== undefined ? (
+                  <p className="mt-2 text-sm text-slate-500">
+                    Total: {formatCurrency(order.totalAmountPaise / 100)}
                   </p>
                 ) : null}
                 {!canAcceptOnlinePayment &&
-                order.status === "completed" &&
+                order.status === "pending" &&
                 payableAmount !== null &&
-                order.paymentStatus === "unpaid" ? (
+                (order.paymentStatus === "unpaid" || order.paymentStatus === "payment_failed") ? (
                   <div className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
                     {getShopPaymentUnavailableMessage(shop)}
+                  </div>
+                ) : null}
+                {order.paymentStatus === "payment_failed" ? (
+                  <div className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                    Payment failed. You can retry checkout with the same server-created order.
                   </div>
                 ) : null}
                 {order.paymentStatus === "paid" ? (

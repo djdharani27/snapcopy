@@ -8,8 +8,6 @@ import {
   fetchRazorpayPayment,
   fetchRazorpayPaymentTransfers,
 } from "@/lib/payments/razorpay";
-import { calculateTransferBreakdown } from "@/lib/payments/transfer-calculation";
-import { getBillingConfig } from "@/lib/platform/billing";
 
 function mapTransferStatus(status: string) {
   switch (status) {
@@ -24,19 +22,15 @@ function mapTransferStatus(status: string) {
   }
 }
 
-export async function ensureOrderTransfer(orderId: string) {
+export async function syncOrderTransferState(orderId: string) {
   const order = await getOrderById(orderId);
 
   if (!order) {
     throw new Error("Order not found.");
   }
 
-  if (order.paymentStatus !== "paid" || !order.razorpayPaymentId) {
-    throw new Error("Transfer can be created only after payment is marked as paid.");
-  }
-
-  if (!order.finalAmount || order.finalAmount <= 0) {
-    throw new Error("Final amount is missing.");
+  if (order.paymentStatus !== "paid" || !order.razorpayPaymentId || !order.totalAmountPaise) {
+    throw new Error("Transfer state can only be synced after payment is marked as paid.");
   }
 
   const shop = await getShopById(order.shopId);
@@ -51,75 +45,32 @@ export async function ensureOrderTransfer(orderId: string) {
     throw new Error("Payment has not been captured yet.");
   }
 
-  const billingConfig = await getBillingConfig();
-  const breakdown = calculateTransferBreakdown({
-    amountPaise: payment.amount,
-    transactionFeePaise: billingConfig.transactionFeePaise,
-    estimatedRazorpayFeePercent: billingConfig.estimatedRazorpayFeePercent,
-    estimatedGstPercent: billingConfig.estimatedGstPercent,
-    transactionFeeEnabled: billingConfig.transactionFeeEnabled,
-    actualFeePaise: payment.fee,
-    actualTaxPaise: payment.tax,
-  });
-
   await updateOrderTransferSnapshot({
     orderId: order.id,
     linkedAccountId: shop.razorpayLinkedAccountId,
-    ...breakdown,
+    platformTransactionFeePaise: 0,
+    estimatedFeePaise: payment.fee ?? 0,
+    estimatedTaxPaise: payment.tax ?? 0,
+    gatewayFeeSource: payment.fee === null ? null : "actual",
+    transferableAmountPaise: order.shopEarningPaise ?? order.totalAmountPaise,
   });
 
-  if (breakdown.transferableAmountPaise === 0) {
+  const transfers = await fetchRazorpayPaymentTransfers(payment.id);
+  const transfer = transfers.items?.find((item) => item.recipient === shop.razorpayLinkedAccountId);
+
+  if (!transfer) {
     await updateOrderTransferState({
       orderId: order.id,
-      transferStatus: "success",
+      transferStatus: "processing",
     });
-
-    console.info("No seller transfer is required because the payout amount is zero", {
-      orderId: order.id,
-      paymentId: payment.id,
-    });
-
     return getOrderById(order.id);
   }
 
-  try {
-    const transfers = await fetchRazorpayPaymentTransfers(payment.id);
-    const transfer = transfers.items?.find(
-      (item) => item.recipient === shop.razorpayLinkedAccountId,
-    );
-
-    if (transfer) {
-      await updateOrderTransferState({
-        orderId: order.id,
-        transferId: transfer.id,
-        transferStatus: mapTransferStatus(transfer.status),
-      });
-
-      console.info("Synced Razorpay Route transfer from payment", {
-        orderId: order.id,
-        transferId: transfer.id,
-        transferStatus: transfer.status,
-      });
-    } else if (!order.transferId || order.transferStatus === "not_created") {
-      await updateOrderTransferState({
-        orderId: order.id,
-        transferStatus: "processing",
-      });
-    }
-  } catch (error) {
-    await updateOrderTransferState({
-      orderId: order.id,
-      transferStatus: "failed",
-    });
-
-    console.error("Razorpay Route transfer sync failed", {
-      orderId: order.id,
-      paymentId: order.razorpayPaymentId,
-      error: error instanceof Error ? error.message : error,
-    });
-
-    throw error;
-  }
+  await updateOrderTransferState({
+    orderId: order.id,
+    transferId: transfer.id,
+    transferStatus: mapTransferStatus(transfer.status),
+  });
 
   return getOrderById(order.id);
 }

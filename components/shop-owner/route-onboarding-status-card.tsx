@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { getRouteOnboardingState } from "@/lib/payments/route-onboarding-status";
+import { SyncRazorpayStatusButton } from "@/components/shop-owner/sync-razorpay-status-button";
 import type { Shop } from "@/types";
 
 function getToneClasses(tone: ReturnType<typeof getRouteOnboardingState>["tone"]) {
@@ -31,9 +32,11 @@ function getStepBadgeClasses(status: "done" | "current" | "pending") {
 export function RouteOnboardingStatusCard({
   shop,
   compact = false,
+  syncEndpoint,
 }: {
   shop?: Shop | null;
   compact?: boolean;
+  syncEndpoint?: string;
 }) {
   const state = getRouteOnboardingState(shop);
 
@@ -52,11 +55,14 @@ export function RouteOnboardingStatusCard({
             </p>
           ) : null}
         </div>
-        {!compact ? (
-          <Link href="/shop-owner/setup" className="btn-secondary">
-            Review setup
-          </Link>
-        ) : null}
+        <div className="flex flex-wrap gap-3">
+          {syncEndpoint ? <SyncRazorpayStatusButton endpoint={syncEndpoint} /> : null}
+          {!compact ? (
+            <Link href="/shop-owner/setup" className="btn-secondary">
+              Review setup
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -83,6 +89,31 @@ export function RouteOnboardingStatusCard({
           <p className="mt-2 text-sm leading-6 opacity-85">{state.paymentBlockedReason}</p>
         </div>
       ) : null}
+
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
+        <div className="rounded-[22px] border border-current/10 bg-white/70 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-70">
+            Linked account
+          </p>
+          <p className="mt-2 text-sm leading-6 opacity-85">
+            {shop?.razorpayLinkedAccountId || "Not created"}
+          </p>
+          <p className="mt-2 text-sm leading-6 opacity-85">
+            Status: {shop?.razorpayLinkedAccountStatus || "not_started"}
+          </p>
+        </div>
+        <div className="rounded-[22px] border border-current/10 bg-white/70 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-70">
+            Route product
+          </p>
+          <p className="mt-2 text-sm leading-6 opacity-85">
+            {shop?.razorpayProductId || "Not created"}
+          </p>
+          <p className="mt-2 text-sm leading-6 opacity-85">
+            Status: {shop?.razorpayProductStatus || "not_requested"}
+          </p>
+        </div>
+      </div>
 
       {state.showCorrectionScreen ? (
         <div className="mt-5 rounded-[22px] border border-current/10 bg-white/70 p-4">

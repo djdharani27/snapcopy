@@ -11,6 +11,7 @@ import { ShopOwnerNav } from "@/components/shop-owner/shop-owner-nav";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { requireRole } from "@/lib/auth/session";
 import { getOrdersForShop, getShopByOwnerId } from "@/lib/firebase/firestore-admin";
+import { canShopReceiveOnlinePayments, getShopPaymentBlockedReason } from "@/lib/payments/shop-readiness";
 
 export default async function ShopOwnerDashboardPage() {
   noStore();
@@ -23,23 +24,19 @@ export default async function ShopOwnerDashboardPage() {
   }
 
   const orders = await getOrdersForShop(shop.id);
+  const isPaymentReady = canShopReceiveOnlinePayments(shop);
 
   return (
     <DashboardShell
       profile={profile}
       title={`${shop.shopName} orders`}
-      description="Manage incoming print requests, update final prices, and track paid orders."
+      description="Manage paid print orders, update fulfilment status, and monitor Route payout readiness."
       hideIntro
       navigation={<ShopOwnerNav active="orders" />}
       actions={
         <>
           <RefreshButton />
-          <Link
-            href="/shop-owner/setup"
-            className="icon-btn"
-            aria-label="Shop settings"
-            title="Shop settings"
-          >
+          <Link href="/shop-owner/setup" className="icon-btn" aria-label="Shop settings" title="Shop settings">
             <svg
               aria-hidden="true"
               viewBox="0 0 24 24"
@@ -58,11 +55,17 @@ export default async function ShopOwnerDashboardPage() {
       }
     >
       <AutoRefresh shopId={shop.id} />
-      <RouteOnboardingStatusCard shop={shop} />
+      <RouteOnboardingStatusCard shop={shop} syncEndpoint="/api/shops/sync-status" />
+      {!isPaymentReady ? (
+        <div className="panel p-6">
+          <p className="text-sm text-slate-500">Route onboarding pending</p>
+          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Online payments are blocked</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">{getShopPaymentBlockedReason(shop)}</p>
+        </div>
+      ) : null}
       <ShopQrToggle>
         <ShopQrCard shopId={shop.id} />
       </ShopQrToggle>
-
       <OrdersTable orders={orders} />
     </DashboardShell>
   );

@@ -1,29 +1,23 @@
 import { NextResponse } from "next/server";
+import { ApiAuthError } from "@/lib/auth/errors";
 import { requireApiAdmin } from "@/lib/auth/admin";
-import { getOrderById } from "@/lib/firebase/firestore-admin";
-import { ensureOrderTransfer } from "@/lib/payments/transfers";
+import { syncOrderTransferState } from "@/lib/payments/transfers";
 
 export async function POST(request: Request) {
   try {
-    await requireApiAdmin();
+    await requireApiAdmin(request);
     const { orderId } = await request.json();
 
     if (!orderId) {
       return NextResponse.json({ error: "Order is required." }, { status: 400 });
     }
 
-    const order = await getOrderById(String(orderId));
-
-    if (!order) {
-      return NextResponse.json({ error: "Order not found." }, { status: 404 });
-    }
-
-    const updatedOrder = await ensureOrderTransfer(order.id);
-    return NextResponse.json({ order: updatedOrder });
+    const order = await syncOrderTransferState(String(orderId));
+    return NextResponse.json({ order });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to create transfer." },
-      { status: 400 },
+      { error: error instanceof Error ? error.message : "Unable to sync transfer." },
+      { status: error instanceof ApiAuthError ? error.status : 400 },
     );
   }
 }

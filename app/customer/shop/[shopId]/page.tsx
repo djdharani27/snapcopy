@@ -7,6 +7,10 @@ import { RefreshButton } from "@/components/layout/refresh-button";
 import { UploadOrderForm } from "@/components/customer/upload-order-form";
 import { requireRole } from "@/lib/auth/session";
 import { getShopById } from "@/lib/firebase/firestore-admin";
+import {
+  canShopReceiveOnlinePayments,
+  getShopPaymentUnavailableMessage,
+} from "@/lib/payments/shop-readiness";
 import { formatCurrency } from "@/lib/utils/format";
 
 export default async function CustomerShopPage({
@@ -23,6 +27,8 @@ export default async function CustomerShopPage({
   if (!shop) {
     notFound();
   }
+
+  const canOrderOnline = canShopReceiveOnlinePayments(shop);
 
   return (
     <DashboardShell
@@ -50,12 +56,7 @@ export default async function CustomerShopPage({
               Call
             </a>
             {shop.googleMapsUrl ? (
-              <a
-                href={shop.googleMapsUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="btn-secondary"
-              >
+              <a href={shop.googleMapsUrl} target="_blank" rel="noreferrer" className="btn-secondary">
                 Location
               </a>
             ) : null}
@@ -80,17 +81,22 @@ export default async function CustomerShopPage({
         </div>
       </div>
 
-      <UploadOrderForm shops={[shop]} profile={profile} initialShopId={shop.id} />
+      {canOrderOnline ? (
+        <UploadOrderForm shops={[shop]} profile={profile} initialShopId={shop.id} />
+      ) : (
+        <div className="panel p-5 text-sm text-amber-900">{getShopPaymentUnavailableMessage(shop)}</div>
+      )}
 
       <div className="mt-5">
         <div className="panel p-5 text-sm text-slate-700">
           <p className="eyebrow">Price list</p>
-          <p className="mt-3">
-            B/W single: {formatCurrency(shop.pricing.blackWhiteSingle)}
-          </p>
+          <p className="mt-3">B/W single: {formatCurrency(shop.pricing.blackWhiteSingle)}</p>
           <p>B/W double: {formatCurrency(shop.pricing.blackWhiteDouble)}</p>
           <p>Color single: {formatCurrency(shop.pricing.colorSingle)}</p>
           <p>Color double: {formatCurrency(shop.pricing.colorDouble)}</p>
+          <p className="mt-3 text-xs text-slate-500">
+            Final order total is calculated on the backend in paise from this rate card, selected page count, and copies.
+          </p>
         </div>
       </div>
     </DashboardShell>

@@ -41,8 +41,10 @@ export function ShopSetupForm({
           city: formData.get("city"),
           state: formData.get("state"),
           postalCode: formData.get("postalCode"),
+          businessType: formData.get("businessType"),
           googleMapsUrl: formData.get("googleMapsUrl"),
           phone: formData.get("phone"),
+          settlementEmail: formData.get("settlementEmail"),
           description: formData.get("description"),
           services: formData.get("services"),
           bankAccountHolderName: formData.get("bankAccountHolderName"),
@@ -94,11 +96,12 @@ export function ShopSetupForm({
         </h1>
         <p className="mt-3 text-sm leading-7 text-slate-600">
           Set your shop details, services, settlement details, and base print prices. Admin
-          approval is required before customers can access the shop. Razorpay linked account and
-          Route product details are added manually by admins from the dashboard after approval.
+          approval and Route activation are required before customers can place paid orders with
+          this shop. Razorpay linked account and Route product details are added by admins from the
+          dashboard after approval.
         </p>
         <p className="mt-2 text-xs leading-6 text-slate-500">
-          Razorpay linked account email: {profile.email || "missing email on your profile"}
+          Your Firebase login email stays separate and is only used for platform sign-in.
         </p>
         {isPending ? (
           <div className="mt-4 rounded-[24px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -111,7 +114,15 @@ export function ShopSetupForm({
             The last request was rejected. Review the details below and submit again.
           </div>
         ) : null}
-        {shop ? <div className="mt-5"><RouteOnboardingStatusCard shop={shop} compact /></div> : null}
+        {shop ? (
+          <div className="mt-5">
+            <RouteOnboardingStatusCard
+              shop={shop}
+              compact
+              syncEndpoint={shop.approvalStatus === "approved" ? "/api/shops/sync-status" : undefined}
+            />
+          </div>
+        ) : null}
       </div>
 
       <div className="grid gap-5 md:grid-cols-2">
@@ -187,6 +198,24 @@ export function ShopSetupForm({
           />
         </div>
 
+        <div>
+          <label className="label" htmlFor="businessType">
+            Business type
+          </label>
+          <select
+            id="businessType"
+            name="businessType"
+            className="input"
+            defaultValue={shop?.businessType || "individual"}
+            {...hydrationSafeProps}
+          >
+            <option value="individual">Individual</option>
+            <option value="proprietorship">Proprietorship</option>
+            <option value="partnership">Partnership</option>
+            <option value="private_limited">Private limited</option>
+          </select>
+        </div>
+
         <div className="md:col-span-2">
           <label className="label" htmlFor="googleMapsUrl">
             Google Maps location
@@ -259,14 +288,23 @@ export function ShopSetupForm({
             <div className="md:col-span-2 rounded-[24px] border border-[#eadfd3] bg-[rgba(255,248,241,0.82)] p-4 text-sm text-slate-600">
               {hasLinkedAccount
                 ? "Admin has already added Razorpay account details for this shop. Update the payout fields below if the admin asks you to correct bank or PAN information."
-                : "Admin approval is required before admins manually add the Razorpay linked account and Route product details. This affects online payouts, not whether the approved shop can fulfill orders."}
-              {isApproved ? (
-                <>
-                  <br />
-                  Your shop can stay live while customers pay offline until the admin completes the
-                  manual Route setup.
-                </>
-              ) : null}
+                : "Admin approval is required before admins add the Razorpay linked account and Route product details. Customers cannot place paid orders until Route is activated."}
+            </div>
+
+            <div>
+              <label className="label" htmlFor="settlementEmail">
+                Settlement Email (used for Razorpay payouts)
+              </label>
+              <input
+                id="settlementEmail"
+                name="settlementEmail"
+                type="email"
+                className="input"
+                defaultValue={shop?.settlementEmail || ""}
+                placeholder="payouts@yourshop.com"
+                required
+                {...hydrationSafeProps}
+              />
             </div>
 
             <div>

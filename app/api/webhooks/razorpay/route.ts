@@ -1,16 +1,25 @@
 import { NextResponse } from "next/server";
 import {
+  getShopByLinkedAccountId,
   getOrderByPaymentId,
   getOrderByRazorpayOrderId,
   getOrderByTransferId,
   hasProcessedWebhookEvent,
   markOrderPaid,
+  markOrderPaymentFailed,
   markWebhookEventProcessed,
+  updateShopRazorpayStatus,
   updateOrderRefundState,
   updateOrderTransferState,
 } from "@/lib/firebase/firestore-admin";
+import {
+  buildRouteWebhookStatusUpdate,
+  getTransferWebhookOrderId,
+  isDuplicateWebhookEventProcessed,
+  mapRouteRequirements,
+} from "@/lib/payments/route-webhook-state";
 import { verifyRazorpayWebhookSignature } from "@/lib/payments/razorpay";
-import { ensureOrderTransfer } from "@/lib/payments/transfers";
+import { syncOrderTransferState } from "@/lib/payments/transfers";
 
 export const runtime = "nodejs";
 
@@ -38,7 +47,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing webhook event id." }, { status: 400 });
   }
 
-  if (await hasProcessedWebhookEvent(eventId)) {
+  if (isDuplicateWebhookEventProcessed(await hasProcessedWebhookEvent(eventId))) {
     return NextResponse.json({ received: true, duplicate: true });
   }
 
@@ -51,16 +60,41 @@ export async function POST(request: Request) {
           order_id?: string | null;
         };
       };
+      order?: {
+        entity?: {
+          id: string;
+        };
+      };
       transfer?: {
         entity?: {
           id: string;
-          status?: string;
           source?: string;
           recipient?: string;
+          status?: string;
+          amount?: number;
+          processed_at?: number | null;
+          error?: {
+            description?: string | null;
+            reason?: string | null;
+          };
           notes?: {
             orderId?: string;
-            shopId?: string;
           };
+        };
+      };
+      merchant_product?: {
+        entity?: {
+          id?: string;
+          merchant_id?: string;
+          activation_status?: string;
+        };
+        data?: {
+          requirements?: Array<{
+            field_reference?: string;
+            resolution_url?: string;
+            reason_code?: string;
+            status?: string;
+          }>;
         };
       };
       refund?: {
@@ -68,7 +102,12 @@ export async function POST(request: Request) {
           id: string;
           payment_id?: string | null;
           amount?: number | null;
-          status?: string | null;
+        };
+      };
+      account?: {
+        entity?: {
+          id?: string;
+          status?: string;
         };
       };
     };
@@ -85,16 +124,57 @@ export async function POST(request: Request) {
           order = await getOrderByRazorpayOrderId(paymentEntity.order_id);
         }
 
-        if (order) {
-          if (order.paymentStatus !== "paid") {
-            await markOrderPaid({
-              orderId: order.id,
-              razorpayOrderId: order.razorpayOrderId || paymentEntity.order_id || "",
-              razorpayPaymentId: paymentEntity.id,
-            });
-          }
+        if (order && order.paymentStatus !== "paid") {
+          await markOrderPaid({
+            orderId: order.id,
+            razorpayOrderId: order.razorpayOrderId || paymentEntity.order_id || "",
+            razorpayPaymentId: paymentEntity.id,
+          });
+        }
 
-          await ensureOrderTransfer(order.id);
+        if (order) {
+          await syncOrderTransferState(order.id);
+        }
+      }
+    }
+
+    if (payload.event === "payment.failed") {
+      const paymentEntity = payload.payload?.payment?.entity;
+
+      if (paymentEntity?.id) {
+        let order = await getOrderByPaymentId(paymentEntity.id);
+
+        if (!order && paymentEntity.order_id) {
+          order = await getOrderByRazorpayOrderId(paymentEntity.order_id);
+        }
+
+        if (order && order.paymentStatus !== "paid") {
+          await markOrderPaymentFailed({
+            orderId: order.id,
+            razorpayOrderId: order.razorpayOrderId || paymentEntity.order_id || null,
+            razorpayPaymentId: paymentEntity.id,
+          });
+        }
+      }
+    }
+
+    if (payload.event === "order.paid") {
+      const orderEntity = payload.payload?.order?.entity;
+      const paymentEntity = payload.payload?.payment?.entity;
+
+      if (orderEntity?.id && paymentEntity?.id) {
+        const order = await getOrderByRazorpayOrderId(orderEntity.id);
+
+        if (order && order.paymentStatus !== "paid") {
+          await markOrderPaid({
+            orderId: order.id,
+            razorpayOrderId: orderEntity.id,
+            razorpayPaymentId: paymentEntity.id,
+          });
+        }
+
+        if (order) {
+          await syncOrderTransferState(order.id);
         }
       }
     }
@@ -106,17 +186,20 @@ export async function POST(request: Request) {
     ) {
       const transferEntity = payload.payload?.transfer?.entity;
 
-      if (transferEntity?.id) {
-        let order = await getOrderByTransferId(transferEntity.id);
+        if (transferEntity?.id) {
+          let order = await getOrderByTransferId(transferEntity.id);
 
-        if (!order && transferEntity.source) {
-          const matchedOrder = await getOrderByPaymentId(transferEntity.source);
-          if (
-            matchedOrder &&
-            (!transferEntity.notes?.orderId || transferEntity.notes.orderId === matchedOrder.id)
-          ) {
-            order = matchedOrder;
-          }
+          if (!order && transferEntity.source) {
+            const razorpayOrderId = getTransferWebhookOrderId(transferEntity.source);
+            const matchedOrder = razorpayOrderId
+              ? await getOrderByRazorpayOrderId(razorpayOrderId)
+              : null;
+            if (
+              matchedOrder &&
+              (!transferEntity.notes?.orderId || transferEntity.notes.orderId === matchedOrder.id)
+            ) {
+              order = matchedOrder;
+            }
         }
 
         if (order) {
@@ -124,6 +207,15 @@ export async function POST(request: Request) {
             orderId: order.id,
             transferId: transferEntity.id,
             transferStatus: mapTransferStatus(payload.event),
+            transferFailureReason:
+              payload.event === "transfer.failed"
+                ? [
+                    String(transferEntity.error?.description || "").trim(),
+                    String(transferEntity.error?.reason || "").trim(),
+                  ]
+                    .filter(Boolean)
+                    .join(" - ")
+                : null,
           });
         }
       }
@@ -157,9 +249,49 @@ export async function POST(request: Request) {
       }
     }
 
+    if (payload.event === "account.updated") {
+      console.info("Razorpay linked account updated", {
+        accountId: payload.payload?.account?.entity?.id || null,
+        status: payload.payload?.account?.entity?.status || null,
+      });
+    }
+
+    if (
+      payload.event === "product.route.activated" ||
+      payload.event === "product.route.under_review" ||
+      payload.event === "product.route.needs_clarification" ||
+      payload.event === "product.route.suspended"
+    ) {
+      const merchantProduct = payload.payload?.merchant_product;
+      const accountId = String(merchantProduct?.entity?.merchant_id || "").trim();
+      const activationStatus = String(merchantProduct?.entity?.activation_status || "").trim();
+
+      if (accountId && activationStatus) {
+        const shop = await getShopByLinkedAccountId(accountId);
+
+        if (shop) {
+          const requirements = mapRouteRequirements(merchantProduct?.data?.requirements);
+          const routeStatusUpdate = buildRouteWebhookStatusUpdate({
+            activationStatus,
+            requirements,
+          });
+
+          await updateShopRazorpayStatus({
+            shopId: shop.id,
+            razorpayProductStatus: routeStatusUpdate.razorpayProductStatus,
+            razorpayProductRequirements: routeStatusUpdate.razorpayProductRequirements,
+            razorpayProductResolutionUrl: routeStatusUpdate.razorpayProductResolutionUrl,
+            paymentBlockedReason: routeStatusUpdate.paymentBlockedReason,
+            isActive: routeStatusUpdate.isAcceptingOrders,
+          });
+        }
+      }
+    }
+
     await markWebhookEventProcessed({
       eventId,
       eventName: payload.event,
+      payloadJson: rawBody,
     });
 
     return NextResponse.json({ received: true });

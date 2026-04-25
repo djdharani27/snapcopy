@@ -63,6 +63,20 @@ export function parsePhone(value: unknown) {
   return digits;
 }
 
+export function parseEmail(value: unknown, field = "Email") {
+  const trimmedValue = String(value || "").trim().toLowerCase();
+
+  if (!trimmedValue) {
+    throw new Error(`${field} is required.`);
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedValue)) {
+    throw new Error(`Enter a valid ${field.toLowerCase()}.`);
+  }
+
+  return trimmedValue;
+}
+
 export function parseRequiredText(value: unknown, field: string) {
   const trimmedValue = String(value || "").trim();
 
@@ -116,7 +130,7 @@ export function parseAcceptedTerms(value: unknown, label: string) {
 export function parseBankAccountNumber(value: unknown) {
   const trimmedValue = String(value || "").replace(/\s/g, "");
 
-  if (!/^\d{5,35}$/.test(trimmedValue)) {
+  if (!/^\d{5,20}$/.test(trimmedValue)) {
     throw new Error("Enter a valid bank account number.");
   }
 

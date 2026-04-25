@@ -6,7 +6,7 @@ import type { UserRole } from "@/types";
 
 export async function POST(request: Request) {
   try {
-    const decoded = await requireApiAuth();
+    const { decoded } = await requireApiAuth(request);
     const { role } = await request.json();
 
     if (!USER_ROLES.includes(role)) {

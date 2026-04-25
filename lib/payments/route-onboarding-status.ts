@@ -197,7 +197,7 @@ export function getRouteOnboardingState(shop?: Shop | null): RouteOnboardingStat
     tone: "warning",
     title: "Online payments are not active yet",
     description:
-      "The shop can still receive orders, but Razorpay payouts are not activated yet. Ask an admin to update the linked account and Route product details manually.",
+      "The shop cannot receive new customer orders until the linked account and Route product are activated. Ask an admin to finish the pending Route onboarding steps.",
     steps,
     requirements,
     paymentBlockedReason,

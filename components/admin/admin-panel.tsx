@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/auth/auth-provider";
 import type { BillingAuditLog, BillingConfig, OrderWithFiles, Shop, UserProfile } from "@/types";
 import { formatCurrency, formatDate, formatPaiseToRupees, formatTrackingId } from "@/lib/utils/format";
 import { canShopReceiveOnlinePayments } from "@/lib/payments/shop-readiness";
@@ -11,7 +12,8 @@ interface AdminPanelProps {
   shopOwners: UserProfile[];
   billing: BillingConfig;
   billingAuditLogs: BillingAuditLog[];
-  payoutAttentionOrders: OrderWithFiles[];
+  settlementAttentionOrders: OrderWithFiles[];
+  transferAttentionOrders: OrderWithFiles[];
 }
 
 interface BillingFormState {
@@ -24,6 +26,7 @@ interface BillingFormState {
 }
 
 interface ShopRouteFormState {
+  settlementEmail: string;
   razorpayLinkedAccountId: string;
   razorpayLinkedAccountStatus: string;
   razorpayStakeholderId: string;
@@ -63,8 +66,17 @@ function formatAuditDate(value?: string | null) {
   return new Date(value).toLocaleString();
 }
 
+function getMissingSettlementFields(shop: Shop) {
+  const requirements = shop.razorpayProductRequirements || [];
+
+  return requirements
+    .map((requirement) => String(requirement.fieldReference || "").trim())
+    .filter((fieldReference) => fieldReference.startsWith("settlements."));
+}
+
 function getShopRouteFormState(shop: Shop): ShopRouteFormState {
   return {
+    settlementEmail: String(shop.settlementEmail || ""),
     razorpayLinkedAccountId: String(shop.razorpayLinkedAccountId || ""),
     razorpayLinkedAccountStatus: String(shop.razorpayLinkedAccountStatus || ""),
     razorpayStakeholderId: String(shop.razorpayStakeholderId || ""),
@@ -129,21 +141,27 @@ export function AdminPanel({
   shopOwners,
   billing,
   billingAuditLogs,
-  payoutAttentionOrders,
+  settlementAttentionOrders,
+  transferAttentionOrders,
 }: AdminPanelProps) {
+  const hydrationSafeProps = { suppressHydrationWarning: true as const };
   const customerPlatformFeeRupees = 0;
   const router = useRouter();
+  const { user } = useAuth();
   const [formError, setFormError] = useState("");
   const [formLoading, setFormLoading] = useState(false);
   const [deletingShopId, setDeletingShopId] = useState<string | null>(null);
   const [reviewingShopId, setReviewingShopId] = useState<string | null>(null);
   const [savingRouteShopId, setSavingRouteShopId] = useState<string | null>(null);
-  const [retryingTransferOrderId, setRetryingTransferOrderId] = useState<string | null>(null);
+  const [syncingRouteShopId, setSyncingRouteShopId] = useState<string | null>(null);
+  const [resettingRouteShopId, setResettingRouteShopId] = useState<string | null>(null);
+  const [settlingOrderId, setSettlingOrderId] = useState<string | null>(null);
   const [cleanupLoading, setCleanupLoading] = useState(false);
   const [storageMessage, setStorageMessage] = useState("");
   const [billingMessage, setBillingMessage] = useState("");
   const [billingLoading, setBillingLoading] = useState(false);
   const [resettingBilling, setResettingBilling] = useState(false);
+  const reviewSubmitLockRef = useRef<string | null>(null);
   const [billingForm, setBillingForm] = useState<BillingFormState>(() =>
     normalizeBillingFormState(getBillingFormState(billing)),
   );
@@ -160,6 +178,40 @@ export function AdminPanel({
     );
   }, [billing, shops]);
 
+  async function getAdminRequestHeaders(contentType?: string) {
+    const headers = new Headers();
+
+    if (contentType) {
+      headers.set("Content-Type", contentType);
+    }
+
+    const token = user ? await user.getIdToken() : null;
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+
+    return headers;
+  }
+
+  async function adminFetch(input: RequestInfo | URL, init?: RequestInit) {
+    const headers = await getAdminRequestHeaders(
+      init?.body ? "application/json" : undefined,
+    );
+
+    if (init?.headers) {
+      const existingHeaders = new Headers(init.headers);
+      existingHeaders.forEach((value, key) => {
+        headers.set(key, value);
+      });
+    }
+
+    return fetch(input, {
+      ...init,
+      headers,
+      credentials: "same-origin",
+    });
+  }
+
   async function handleCreateShop(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormLoading(true);
@@ -168,9 +220,8 @@ export function AdminPanel({
     const formData = new FormData(event.currentTarget);
 
     try {
-      const response = await fetch("/api/admin/shops", {
+      const response = await adminFetch("/api/admin/shops", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ownerId: formData.get("ownerId"),
           shopName: formData.get("shopName"),
@@ -213,9 +264,8 @@ export function AdminPanel({
     setFormError("");
 
     try {
-      const response = await fetch("/api/admin/billing", {
+      const response = await adminFetch("/api/admin/billing", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           shopCreationFeePaise: Math.round(Number(billingForm.shopCreationFeeRupees || 0) * 100),
           transactionFeePaise: Math.round(Number(billingForm.transactionFeeRupees || 0) * 100),
@@ -250,7 +300,7 @@ export function AdminPanel({
     setFormError("");
 
     try {
-      const response = await fetch("/api/admin/billing", {
+      const response = await adminFetch("/api/admin/billing", {
         method: "POST",
       });
       const payload = await response.json();
@@ -285,7 +335,7 @@ export function AdminPanel({
     setDeletingShopId(shopId);
 
     try {
-      const response = await fetch(`/api/admin/shops/${shopId}`, {
+      const response = await adminFetch(`/api/admin/shops/${shopId}`, {
         method: "DELETE",
       });
       const payload = await response.json();
@@ -302,13 +352,17 @@ export function AdminPanel({
   }
 
   async function handleReviewShop(shopId: string, action: "approve" | "reject") {
+    if (reviewSubmitLockRef.current || reviewingShopId || savingRouteShopId === shopId) {
+      return;
+    }
+
+    reviewSubmitLockRef.current = `${shopId}:${action}`;
     setReviewingShopId(shopId);
     setFormError("");
 
     try {
-      const response = await fetch(`/api/admin/shops/${shopId}`, {
+      const response = await adminFetch(`/api/admin/shops/${shopId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       });
       const payload = await response.json();
@@ -316,10 +370,15 @@ export function AdminPanel({
         throw new Error(payload.error || "Unable to update shop approval.");
       }
 
+      if (payload.message) {
+        setBillingMessage(payload.message);
+      }
+
       router.refresh();
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "Unable to update shop approval.");
     } finally {
+      reviewSubmitLockRef.current = null;
       setReviewingShopId(null);
     }
   }
@@ -329,9 +388,8 @@ export function AdminPanel({
     setFormError("");
 
     try {
-      const response = await fetch(`/api/admin/shops/${shopId}`, {
+      const response = await adminFetch(`/api/admin/shops/${shopId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(shopRouteForms[shopId] || {}),
       });
       const payload = await response.json();
@@ -347,24 +405,83 @@ export function AdminPanel({
     }
   }
 
-  async function handleRetryTransfer(orderId: string) {
-    setRetryingTransferOrderId(orderId);
+  async function handleSyncRouteStatus(shopId: string) {
+    setSyncingRouteShopId(shopId);
     setFormError("");
 
     try {
-      const response = await fetch(`/api/admin/orders/${orderId}/retry-transfer`, {
+      const response = await adminFetch(`/api/admin/shops/${shopId}/sync-status`, {
         method: "POST",
       });
       const payload = await response.json();
       if (!response.ok) {
-        throw new Error(payload.error || "Unable to retry transfer.");
+        throw new Error(payload.error || "Unable to sync Razorpay status.");
+      }
+
+      if (payload.message) {
+        setBillingMessage(payload.message);
       }
 
       router.refresh();
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Unable to retry transfer.");
+      setFormError(error instanceof Error ? error.message : "Unable to sync Razorpay status.");
     } finally {
-      setRetryingTransferOrderId(null);
+      setSyncingRouteShopId(null);
+    }
+  }
+
+  async function handleResetRouteOnboarding(shopId: string) {
+    const confirmed = window.confirm(
+      "Reset Razorpay Route onboarding for this shop? This clears the stored linked account, stakeholder, and product ids so the next approval can create a fresh account.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setResettingRouteShopId(shopId);
+    setFormError("");
+
+    try {
+      const response = await adminFetch(`/api/admin/shops/${shopId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "reset_route_onboarding" }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Unable to reset Route onboarding.");
+      }
+
+      if (payload.message) {
+        setBillingMessage(payload.message);
+      }
+
+      router.refresh();
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Unable to reset Route onboarding.");
+    } finally {
+      setResettingRouteShopId(null);
+    }
+  }
+
+  async function handleMarkSettlementPaid(orderId: string) {
+    setSettlingOrderId(orderId);
+    setFormError("");
+
+    try {
+      const response = await adminFetch(`/api/admin/orders/${orderId}/settlement`, {
+        method: "POST",
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Unable to mark settlement paid.");
+      }
+
+      router.refresh();
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Unable to mark settlement paid.");
+    } finally {
+      setSettlingOrderId(null);
     }
   }
 
@@ -382,7 +499,7 @@ export function AdminPanel({
     setFormError("");
 
     try {
-      const response = await fetch("/api/admin/storage", {
+      const response = await adminFetch("/api/admin/storage", {
         method: "DELETE",
       });
       const payload = await response.json();
@@ -471,6 +588,7 @@ export function AdminPanel({
               min="0"
               step="0.01"
               className="input"
+              {...hydrationSafeProps}
               value={billingForm.shopCreationFeeRupees ?? ""}
               onChange={(event) =>
                 setBillingForm((current) => ({
@@ -491,6 +609,7 @@ export function AdminPanel({
               min="0"
               step="0.01"
               className="input"
+              {...hydrationSafeProps}
               value={billingForm.transactionFeeRupees ?? ""}
               onChange={(event) =>
                 setBillingForm((current) => ({
@@ -511,6 +630,7 @@ export function AdminPanel({
               min="0"
               step="0.01"
               className="input"
+              {...hydrationSafeProps}
               value={billingForm.estimatedRazorpayFeePercent ?? ""}
               onChange={(event) =>
                 setBillingForm((current) => ({
@@ -531,6 +651,7 @@ export function AdminPanel({
               min="0"
               step="0.01"
               className="input"
+              {...hydrationSafeProps}
               value={billingForm.estimatedGstPercent ?? ""}
               onChange={(event) =>
                 setBillingForm((current) => ({
@@ -544,6 +665,7 @@ export function AdminPanel({
           <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
             <input
               type="checkbox"
+              {...hydrationSafeProps}
               checked={billingForm.shopCreationFeeEnabled ?? false}
               onChange={(event) =>
                 setBillingForm((current) => ({
@@ -558,6 +680,7 @@ export function AdminPanel({
           <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
             <input
               type="checkbox"
+              {...hydrationSafeProps}
               checked={billingForm.transactionFeeEnabled ?? false}
               onChange={(event) =>
                 setBillingForm((current) => ({
@@ -575,10 +698,16 @@ export function AdminPanel({
               onClick={handleResetBilling}
               disabled={resettingBilling}
               className="btn-secondary"
+              {...hydrationSafeProps}
             >
               {resettingBilling ? "Resetting..." : "Reset to defaults"}
             </button>
-            <button type="submit" disabled={billingLoading} className="btn-primary">
+            <button
+              type="submit"
+              disabled={billingLoading}
+              className="btn-primary"
+              {...hydrationSafeProps}
+            >
               {billingLoading ? "Saving..." : "Save billing settings"}
             </button>
           </div>
@@ -658,19 +787,80 @@ export function AdminPanel({
 
       <section className="panel p-4 sm:p-6">
         <div className="mb-6">
-          <p className="text-sm text-slate-500">Payout operations</p>
-          <h2 className="mt-2 text-xl font-semibold text-slate-900">Orders needing attention</h2>
+          <p className="text-sm text-slate-500">Transfer operations</p>
+          <h2 className="mt-2 text-xl font-semibold text-slate-900">Failed or pending Route transfers</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            Failed seller payouts and refund-related states are handled by admins here instead of
-            being retried from the customer flow.
+            These orders are paid on Razorpay, but the Route transfer still needs attention.
           </p>
         </div>
 
-        {payoutAttentionOrders.length === 0 ? (
-          <p className="text-sm text-slate-600">No payout retries or refund states need action.</p>
+        {transferAttentionOrders.length === 0 ? (
+          <p className="text-sm text-slate-600">No Route transfer issues need attention right now.</p>
         ) : (
           <div className="space-y-4">
-            {payoutAttentionOrders.map((order) => {
+            {transferAttentionOrders.map((order) => {
+              const shop = shops.find((entry) => entry.id === order.shopId);
+
+              return (
+                <div
+                  key={order.id}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex rounded-full bg-rose-100 px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-rose-900">
+                      {order.transferStatus || "pending"}
+                    </span>
+                    <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-slate-700">
+                      {order.paymentStatus}
+                    </span>
+                  </div>
+                  <p className="mt-3 font-semibold text-slate-900">
+                    {shop?.shopName || "Shop"} | {formatTrackingId(order.shopId, order.trackingCode, order.id)}
+                  </p>
+                  <p className="mt-1">Order ID: {order.id}</p>
+                  <p className="mt-1">
+                    Shop payout amount:{" "}
+                    {order.shopEarningPaise !== null && order.shopEarningPaise !== undefined
+                      ? formatCurrency(order.shopEarningPaise / 100)
+                      : "-"}
+                  </p>
+                  <p className="mt-1">Failure reason: {order.transferFailureReason || "-"}</p>
+                  <p className="mt-1">
+                    Last transfer update: {formatAuditDate(order.transferUpdatedAt || null)}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void handleMarkSettlementPaid(order.id)}
+                      disabled
+                      className="btn-secondary opacity-60"
+                      {...hydrationSafeProps}
+                    >
+                      Waiting for Route reconciliation
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="panel p-4 sm:p-6">
+        <div className="mb-6">
+          <p className="text-sm text-slate-500">Settlement operations</p>
+          <h2 className="mt-2 text-xl font-semibold text-slate-900">Pending shop settlements</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            For MVP, customer payments land in the platform account first. Admins track the amount
+            payable to each shop here and mark settlements paid manually.
+          </p>
+        </div>
+
+        {settlementAttentionOrders.length === 0 ? (
+          <p className="text-sm text-slate-600">No pending manual settlements right now.</p>
+        ) : (
+          <div className="space-y-4">
+            {settlementAttentionOrders.map((order) => {
               const shop = shops.find((entry) => entry.id === order.shopId);
 
               return (
@@ -680,7 +870,7 @@ export function AdminPanel({
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-amber-900">
-                      {order.transferStatus || "not_created"}
+                      {order.settlementStatus || "pending"}
                     </span>
                     <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-slate-700">
                       {order.paymentStatus}
@@ -694,35 +884,47 @@ export function AdminPanel({
                   </p>
                   <p className="mt-1">Placed: {formatDate(order.createdAt)}</p>
                   <p className="mt-1">
-                    Final amount:{" "}
-                    {order.finalAmount !== null && order.finalAmount !== undefined
-                      ? formatCurrency(order.finalAmount)
+                    Print cost:{" "}
+                    {order.printCostPaise !== null && order.printCostPaise !== undefined
+                      ? formatCurrency(order.printCostPaise / 100)
                       : "-"}
                   </p>
                   <p className="mt-1">
-                    Expected shop payout:{" "}
-                    {order.transferableAmountPaise !== null &&
-                    order.transferableAmountPaise !== undefined
-                      ? formatCurrency(order.transferableAmountPaise / 100)
+                    Platform fee:{" "}
+                    {order.platformFeePaise !== null && order.platformFeePaise !== undefined
+                      ? formatCurrency(order.platformFeePaise / 100)
                       : "-"}
                   </p>
-                  {order.refundedAmountPaise !== null && order.refundedAmountPaise !== undefined ? (
+                  <p className="mt-1">
+                    Customer total:{" "}
+                    {order.totalAmountPaise !== null && order.totalAmountPaise !== undefined
+                      ? formatCurrency(order.totalAmountPaise / 100)
+                      : "-"}
+                  </p>
+                  <p className="mt-1">
+                    Pending shop amount:{" "}
+                    {order.shopEarningPaise !== null && order.shopEarningPaise !== undefined
+                      ? formatCurrency(order.shopEarningPaise / 100)
+                      : "-"}
+                  </p>
+                  {order.settlementPaidAt ? (
                     <p className="mt-1">
-                      Refund amount: {formatCurrency(order.refundedAmountPaise / 100)}
+                      Settlement paid at: {formatDate(order.settlementPaidAt)}
                     </p>
                   ) : null}
                   <div className="mt-4 flex flex-wrap gap-3">
                     <button
                       type="button"
-                      onClick={() => void handleRetryTransfer(order.id)}
+                      onClick={() => void handleMarkSettlementPaid(order.id)}
                       disabled={
-                        retryingTransferOrderId === order.id ||
+                        settlingOrderId === order.id ||
                         order.paymentStatus !== "paid" ||
-                        order.transferStatus === "success"
+                        order.settlementStatus === "paid"
                       }
                       className="btn-secondary"
+                      {...hydrationSafeProps}
                     >
-                      {retryingTransferOrderId === order.id ? "Retrying..." : "Retry payout"}
+                      {settlingOrderId === order.id ? "Saving..." : "Mark settlement paid"}
                     </button>
                   </div>
                 </div>
@@ -749,6 +951,7 @@ export function AdminPanel({
             onClick={handleClearStorage}
             disabled={cleanupLoading}
             className="w-full rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+            {...hydrationSafeProps}
           >
             {cleanupLoading ? "Deleting files..." : "Delete downloaded files"}
           </button>
@@ -767,7 +970,14 @@ export function AdminPanel({
             <label className="label" htmlFor="ownerId">
               Shop owner
             </label>
-            <select id="ownerId" name="ownerId" className="input" required defaultValue="">
+            <select
+              id="ownerId"
+              name="ownerId"
+              className="input"
+              required
+              defaultValue=""
+              {...hydrationSafeProps}
+            >
               <option value="" disabled>
                 Select a shop owner
               </option>
@@ -783,28 +993,28 @@ export function AdminPanel({
             <label className="label" htmlFor="shopName">
               Shop name
             </label>
-            <input id="shopName" name="shopName" className="input" required />
+            <input id="shopName" name="shopName" className="input" required {...hydrationSafeProps} />
           </div>
 
           <div className="md:col-span-2">
             <label className="label" htmlFor="address">
               Address
             </label>
-            <input id="address" name="address" className="input" required />
+            <input id="address" name="address" className="input" required {...hydrationSafeProps} />
           </div>
 
           <div>
             <label className="label" htmlFor="city">
               City
             </label>
-            <input id="city" name="city" className="input" required />
+            <input id="city" name="city" className="input" required {...hydrationSafeProps} />
           </div>
 
           <div>
             <label className="label" htmlFor="state">
               State
             </label>
-            <input id="state" name="state" className="input" required />
+            <input id="state" name="state" className="input" required {...hydrationSafeProps} />
           </div>
 
           <div>
@@ -819,6 +1029,7 @@ export function AdminPanel({
               pattern="[0-9]{6}"
               maxLength={6}
               required
+              {...hydrationSafeProps}
             />
           </div>
 
@@ -832,6 +1043,7 @@ export function AdminPanel({
               className="input"
               type="url"
               placeholder="Paste the Google Maps share link"
+              {...hydrationSafeProps}
             />
           </div>
 
@@ -839,7 +1051,7 @@ export function AdminPanel({
             <label className="label" htmlFor="phone">
               Phone
             </label>
-            <input id="phone" name="phone" className="input" required />
+            <input id="phone" name="phone" className="input" required {...hydrationSafeProps} />
           </div>
 
           <div>
@@ -851,6 +1063,7 @@ export function AdminPanel({
               name="description"
               className="input"
               placeholder="Short shop summary"
+              {...hydrationSafeProps}
             />
           </div>
 
@@ -864,6 +1077,7 @@ export function AdminPanel({
               className="input"
               placeholder="acc_XXXXXXXXXXXXXX"
               required
+              {...hydrationSafeProps}
             />
           </div>
 
@@ -876,6 +1090,7 @@ export function AdminPanel({
               name="services"
               className="input"
               placeholder="Xerox, binding, lamination, scanning"
+              {...hydrationSafeProps}
             />
           </div>
 
@@ -892,6 +1107,7 @@ export function AdminPanel({
               className="input"
               defaultValue="0"
               required
+              {...hydrationSafeProps}
             />
           </div>
 
@@ -908,6 +1124,7 @@ export function AdminPanel({
               className="input"
               defaultValue="0"
               required
+              {...hydrationSafeProps}
             />
           </div>
 
@@ -924,6 +1141,7 @@ export function AdminPanel({
               className="input"
               defaultValue="0"
               required
+              {...hydrationSafeProps}
             />
           </div>
 
@@ -940,11 +1158,17 @@ export function AdminPanel({
               className="input"
               defaultValue="0"
               required
+              {...hydrationSafeProps}
             />
           </div>
 
           <div className="md:col-span-2 flex justify-end">
-            <button type="submit" disabled={formLoading} className="btn-primary w-full sm:w-auto">
+            <button
+              type="submit"
+              disabled={formLoading}
+              className="btn-primary w-full sm:w-auto"
+              {...hydrationSafeProps}
+            >
               {formLoading ? "Creating..." : "Create shop"}
             </button>
           </div>
@@ -958,9 +1182,9 @@ export function AdminPanel({
           <p className="text-sm text-slate-500">Approval queue</p>
           <h2 className="mt-2 text-xl font-semibold text-slate-900">Pending shop requests</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Shop-owner submissions stay blocked here until an admin approves them. After approval,
-            admins manually add the linked account, stakeholder, Route product, and payout status
-            details here before online payments are allowed.
+            Shop-owner submissions stay blocked here until an admin approves them. Approval now
+            runs the full idempotent Razorpay Route onboarding flow and saves the linked account,
+            stakeholder, product, activation status, and blocking reason back to Firestore.
           </p>
         </div>
 
@@ -970,6 +1194,15 @@ export function AdminPanel({
           <div className="space-y-4">
             {pendingShops.map((shop) => (
               <div key={shop.id} className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                {(() => {
+                  const isRowBusy =
+                    reviewingShopId === shop.id ||
+                    savingRouteShopId === shop.id ||
+                    syncingRouteShopId === shop.id ||
+                    resettingRouteShopId === shop.id;
+
+                  return (
+                    <>
                 <div className="flex flex-wrap items-center gap-2">
                   <span
                     className={`inline-flex rounded-full px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.18em] ${getApprovalBadge(shop).className}`}
@@ -993,16 +1226,74 @@ export function AdminPanel({
                 <p className="mt-1">
                   Settlement: {shop.bankAccountHolderName || "-"} / {shop.bankIfsc || "-"}
                 </p>
+                <p className="mt-1">Settlement email: {shop.settlementEmail || "-"}</p>
                 <p className="mt-1">
                   Linked account status: {shop.razorpayLinkedAccountStatus || "-"}
                 </p>
                 <p className="mt-1">
                   Route product status: {shop.razorpayProductStatus || "-"}
                 </p>
+                <p className="mt-1">
+                  Payment status: {canShopReceiveOnlinePayments(shop) ? "Ready" : "Blocked"}
+                </p>
+                <p className="mt-1">
+                  Last synced: {formatAuditDate(shop.razorpayStatusLastSyncedAt || null)}
+                </p>
+                {shop.onboardingStep ? (
+                  <p className="mt-1 text-amber-800">
+                    Onboarding step: {shop.onboardingStep}
+                  </p>
+                ) : null}
+                {shop.onboardingError ? (
+                  <p className="mt-1 text-rose-700">
+                    Onboarding error: {shop.onboardingError}
+                  </p>
+                ) : null}
+                {shop.paymentBlockedReason ? (
+                  <p className="mt-1 text-rose-700">
+                    Blocked reason: {shop.paymentBlockedReason}
+                  </p>
+                ) : null}
+                {shop.razorpayProductRequirements?.length ? (
+                  <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+                    <p className="font-semibold">Razorpay requirements</p>
+                    {getMissingSettlementFields(shop).length ? (
+                      <p className="mt-2 font-medium">
+                        Missing settlement fields: {getMissingSettlementFields(shop).join(", ")}
+                      </p>
+                    ) : null}
+                    <div className="mt-2 space-y-1">
+                      {shop.razorpayProductRequirements.map((requirement, index) => (
+                        <p key={`${shop.id}-requirement-${index}`}>
+                          {[requirement.fieldReference, requirement.reasonCode, requirement.status]
+                            .filter(Boolean)
+                            .join(" - ")}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <input
+                    className="input md:col-span-2"
+                    placeholder="Settlement email"
+                    type="email"
+                    {...hydrationSafeProps}
+                    value={shopRouteForms[shop.id]?.settlementEmail || ""}
+                    onChange={(event) =>
+                      setShopRouteForms((current) => ({
+                        ...current,
+                        [shop.id]: {
+                          ...current[shop.id],
+                          settlementEmail: event.target.value,
+                        },
+                      }))
+                    }
+                  />
                   <input
                     className="input"
                     placeholder="Linked account id"
+                    {...hydrationSafeProps}
                     value={shopRouteForms[shop.id]?.razorpayLinkedAccountId || ""}
                     onChange={(event) =>
                       setShopRouteForms((current) => ({
@@ -1017,6 +1308,7 @@ export function AdminPanel({
                   <input
                     className="input"
                     placeholder="Linked account status"
+                    {...hydrationSafeProps}
                     value={shopRouteForms[shop.id]?.razorpayLinkedAccountStatus || ""}
                     onChange={(event) =>
                       setShopRouteForms((current) => ({
@@ -1031,6 +1323,7 @@ export function AdminPanel({
                   <input
                     className="input"
                     placeholder="Stakeholder id"
+                    {...hydrationSafeProps}
                     value={shopRouteForms[shop.id]?.razorpayStakeholderId || ""}
                     onChange={(event) =>
                       setShopRouteForms((current) => ({
@@ -1045,6 +1338,7 @@ export function AdminPanel({
                   <input
                     className="input"
                     placeholder="Route product id"
+                    {...hydrationSafeProps}
                     value={shopRouteForms[shop.id]?.razorpayProductId || ""}
                     onChange={(event) =>
                       setShopRouteForms((current) => ({
@@ -1059,6 +1353,7 @@ export function AdminPanel({
                   <input
                     className="input"
                     placeholder="Route product status"
+                    {...hydrationSafeProps}
                     value={shopRouteForms[shop.id]?.razorpayProductStatus || ""}
                     onChange={(event) =>
                       setShopRouteForms((current) => ({
@@ -1073,6 +1368,7 @@ export function AdminPanel({
                   <input
                     className="input"
                     placeholder="Bank account holder name"
+                    {...hydrationSafeProps}
                     value={shopRouteForms[shop.id]?.bankAccountHolderName || ""}
                     onChange={(event) =>
                       setShopRouteForms((current) => ({
@@ -1087,6 +1383,7 @@ export function AdminPanel({
                   <input
                     className="input"
                     placeholder="Bank IFSC"
+                    {...hydrationSafeProps}
                     value={shopRouteForms[shop.id]?.bankIfsc || ""}
                     onChange={(event) =>
                       setShopRouteForms((current) => ({
@@ -1101,6 +1398,7 @@ export function AdminPanel({
                   <input
                     className="input md:col-span-2"
                     placeholder="Bank account last 4"
+                    {...hydrationSafeProps}
                     value={shopRouteForms[shop.id]?.bankAccountLast4 || ""}
                     onChange={(event) =>
                       setShopRouteForms((current) => ({
@@ -1114,36 +1412,75 @@ export function AdminPanel({
                   />
                 </div>
                 <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
-                  Approval only unlocks the shop record. Online payments stay blocked until an
-                  admin fills the manual Razorpay Route details here and sets the Route product
-                  status to <span className="font-semibold text-slate-900">activated</span>.
+                  Paste a verified linked account id for manual override only. Save Razorpay
+                  details now verifies the linked account with Razorpay before storing it.
+                </div>
+                <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                  Settlement email is the email used for Razorpay linked account creation. It does
+                  not change platform login/authentication.
+                </div>
+                <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                  If the stored linked account is inaccessible, reset Route onboarding here or
+                  attach a valid linked account before retrying approval.
+                </div>
+                <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                  Online payments stay blocked until the Route product reaches{" "}
+                  <span className="font-semibold text-slate-900">activated</span>. Use Approve to
+                  run the full onboarding flow again, or Sync Razorpay Status to fetch the latest
+                  Route product configuration from Razorpay.
                 </div>
                 <div className="mt-4 flex flex-wrap gap-3">
                   <button
                     type="button"
                     onClick={() => void handleReviewShop(shop.id, "approve")}
-                    disabled={reviewingShopId === shop.id}
+                    disabled={isRowBusy}
                     className="btn-primary"
+                    {...hydrationSafeProps}
                   >
-                    {reviewingShopId === shop.id ? "Saving..." : "Approve"}
+                    {reviewingShopId === shop.id ? "Approving..." : "Approve"}
                   </button>
                   <button
                     type="button"
                     onClick={() => void handleReviewShop(shop.id, "reject")}
-                    disabled={reviewingShopId === shop.id}
+                    disabled={isRowBusy}
                     className="btn-secondary"
+                    {...hydrationSafeProps}
                   >
                     {reviewingShopId === shop.id ? "Saving..." : "Reject"}
                   </button>
                   <button
                     type="button"
                     onClick={() => void handleSaveRouteDetails(shop.id)}
-                    disabled={savingRouteShopId === shop.id}
+                    disabled={isRowBusy}
                     className="btn-secondary"
+                    {...hydrationSafeProps}
                   >
                     {savingRouteShopId === shop.id ? "Saving..." : "Save Razorpay details"}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSyncRouteStatus(shop.id)}
+                    disabled={isRowBusy}
+                    className="btn-secondary"
+                    {...hydrationSafeProps}
+                  >
+                    {syncingRouteShopId === shop.id ? "Syncing..." : "Sync Razorpay Status"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleResetRouteOnboarding(shop.id)}
+                    disabled={isRowBusy}
+                    className="btn-secondary"
+                    {...hydrationSafeProps}
+                  >
+                    {resettingRouteShopId === shop.id
+                      ? "Resetting..."
+                      : "Reset Route onboarding"}
+                  </button>
                 </div>
+                    </>
+                  );
+                })()}
               </div>
             ))}
           </div>
@@ -1188,15 +1525,65 @@ export function AdminPanel({
                     {shopOwners.find((owner) => owner.uid === shop.ownerId)?.email || shop.ownerId}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
+                    Settlement email: {shop.settlementEmail || "-"}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
                     Linked account status: {shop.razorpayLinkedAccountStatus || "-"}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
                     Route product status: {shop.razorpayProductStatus || "-"}
                   </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Payment status: {canShopReceiveOnlinePayments(shop) ? "Ready" : "Blocked"}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Last synced: {formatAuditDate(shop.razorpayStatusLastSyncedAt || null)}
+                  </p>
+                  {shop.paymentBlockedReason ? (
+                    <p className="mt-1 text-xs text-rose-700">
+                      Blocked reason: {shop.paymentBlockedReason}
+                    </p>
+                  ) : null}
+                  {shop.razorpayProductRequirements?.length ? (
+                    <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+                      <p className="font-semibold">Razorpay requirements</p>
+                      {getMissingSettlementFields(shop).length ? (
+                        <p className="mt-2 font-medium">
+                          Missing settlement fields: {getMissingSettlementFields(shop).join(", ")}
+                        </p>
+                      ) : null}
+                      <div className="mt-2 space-y-1">
+                        {shop.razorpayProductRequirements.map((requirement, index) => (
+                          <p key={`${shop.id}-reviewed-requirement-${index}`}>
+                            {[requirement.fieldReference, requirement.reasonCode, requirement.status]
+                              .filter(Boolean)
+                              .join(" - ")}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    <input
+                      className="input text-sm md:col-span-2"
+                      placeholder="Settlement email"
+                      type="email"
+                      {...hydrationSafeProps}
+                      value={shopRouteForms[shop.id]?.settlementEmail || ""}
+                      onChange={(event) =>
+                        setShopRouteForms((current) => ({
+                          ...current,
+                          [shop.id]: {
+                            ...current[shop.id],
+                            settlementEmail: event.target.value,
+                          },
+                        }))
+                      }
+                    />
                     <input
                       className="input text-sm"
                       placeholder="Linked account id"
+                      {...hydrationSafeProps}
                       value={shopRouteForms[shop.id]?.razorpayLinkedAccountId || ""}
                       onChange={(event) =>
                         setShopRouteForms((current) => ({
@@ -1211,6 +1598,7 @@ export function AdminPanel({
                     <input
                       className="input text-sm"
                       placeholder="Linked account status"
+                      {...hydrationSafeProps}
                       value={shopRouteForms[shop.id]?.razorpayLinkedAccountStatus || ""}
                       onChange={(event) =>
                         setShopRouteForms((current) => ({
@@ -1225,6 +1613,7 @@ export function AdminPanel({
                     <input
                       className="input text-sm"
                       placeholder="Stakeholder id"
+                      {...hydrationSafeProps}
                       value={shopRouteForms[shop.id]?.razorpayStakeholderId || ""}
                       onChange={(event) =>
                         setShopRouteForms((current) => ({
@@ -1239,6 +1628,7 @@ export function AdminPanel({
                     <input
                       className="input text-sm"
                       placeholder="Route product id"
+                      {...hydrationSafeProps}
                       value={shopRouteForms[shop.id]?.razorpayProductId || ""}
                       onChange={(event) =>
                         setShopRouteForms((current) => ({
@@ -1253,6 +1643,7 @@ export function AdminPanel({
                     <input
                       className="input text-sm"
                       placeholder="Route product status"
+                      {...hydrationSafeProps}
                       value={shopRouteForms[shop.id]?.razorpayProductStatus || ""}
                       onChange={(event) =>
                         setShopRouteForms((current) => ({
@@ -1267,6 +1658,7 @@ export function AdminPanel({
                     <input
                       className="input text-sm"
                       placeholder="Bank account holder name"
+                      {...hydrationSafeProps}
                       value={shopRouteForms[shop.id]?.bankAccountHolderName || ""}
                       onChange={(event) =>
                         setShopRouteForms((current) => ({
@@ -1281,6 +1673,7 @@ export function AdminPanel({
                     <input
                       className="input text-sm"
                       placeholder="Bank IFSC"
+                      {...hydrationSafeProps}
                       value={shopRouteForms[shop.id]?.bankIfsc || ""}
                       onChange={(event) =>
                         setShopRouteForms((current) => ({
@@ -1295,6 +1688,7 @@ export function AdminPanel({
                     <input
                       className="input text-sm md:col-span-2"
                       placeholder="Bank account last 4"
+                      {...hydrationSafeProps}
                       value={shopRouteForms[shop.id]?.bankAccountLast4 || ""}
                       onChange={(event) =>
                         setShopRouteForms((current) => ({
@@ -1308,25 +1702,62 @@ export function AdminPanel({
                     />
                   </div>
                   <p className="mt-3 text-xs leading-5 text-slate-500">
-                    This section is the source of truth for manual Route setup. Online payment only
-                    unlocks after the linked account and Route product are saved here with
-                    `activated` statuses.
+                    Settlement email is the email used for Razorpay linked account creation.
+                  </p>
+                  <p className="mt-3 text-xs leading-5 text-slate-500">
+                    If the stored linked account is inaccessible, reset Route onboarding or attach
+                    a valid linked account before retrying approval or sync.
+                  </p>
+                  <p className="mt-3 text-xs leading-5 text-slate-500">
+                    Online payment only unlocks after the Route product is `activated`. Sync
+                    Razorpay Status only fetches the latest Route product configuration and updates
+                    local status.
                   </p>
                 </div>
                 <div className="flex w-full flex-col gap-3 md:w-auto">
                   <button
                     type="button"
-                    onClick={() => void handleSaveRouteDetails(shop.id)}
-                    disabled={savingRouteShopId === shop.id}
+                    onClick={() => void handleSyncRouteStatus(shop.id)}
+                    disabled={syncingRouteShopId === shop.id || savingRouteShopId === shop.id}
                     className="btn-secondary w-full md:w-auto"
+                    {...hydrationSafeProps}
+                  >
+                    {syncingRouteShopId === shop.id ? "Syncing..." : "Sync Razorpay Status"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveRouteDetails(shop.id)}
+                    disabled={
+                      savingRouteShopId === shop.id ||
+                      syncingRouteShopId === shop.id ||
+                      resettingRouteShopId === shop.id
+                    }
+                    className="btn-secondary w-full md:w-auto"
+                    {...hydrationSafeProps}
                   >
                     {savingRouteShopId === shop.id ? "Saving..." : "Save Razorpay details"}
                   </button>
                   <button
                     type="button"
+                    onClick={() => void handleResetRouteOnboarding(shop.id)}
+                    disabled={
+                      resettingRouteShopId === shop.id ||
+                      savingRouteShopId === shop.id ||
+                      syncingRouteShopId === shop.id
+                    }
+                    className="btn-secondary w-full md:w-auto"
+                    {...hydrationSafeProps}
+                  >
+                    {resettingRouteShopId === shop.id
+                      ? "Resetting..."
+                      : "Reset Route onboarding"}
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleDeleteShop(shop.id, shop.shopName)}
-                    disabled={deletingShopId === shop.id}
+                    disabled={deletingShopId === shop.id || resettingRouteShopId === shop.id}
                     className="w-full rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70 md:w-auto"
+                    {...hydrationSafeProps}
                   >
                     {deletingShopId === shop.id ? "Deleting..." : "Delete shop"}
                   </button>
