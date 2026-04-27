@@ -107,9 +107,13 @@ export interface Shop {
   bankAccountHolderName?: string;
   bankIfsc?: string;
   bankAccountLast4?: string;
+  bankAccountLast4Masked?: string;
+  panLast4Masked?: string;
   pendingBankAccountNumber?: string;
   pendingOwnerPan?: string;
   pendingRouteTermsAccepted?: boolean;
+  onlinePaymentsEnabled?: boolean;
+  paymentOnboardingNote?: string;
   subscriptionStatus?: ShopSubscriptionStatus;
   subscriptionValidUntil?: string | null;
   razorpaySubscriptionOrderId?: string | null;

@@ -45,7 +45,7 @@ export function RouteOnboardingStatusCard({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-3xl">
           <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em]">
-            Route payout setup
+            Payout setup
           </p>
           <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em]">{state.title}</h2>
           <p className="mt-3 text-sm leading-6 opacity-85">{state.description}</p>
@@ -99,18 +99,18 @@ export function RouteOnboardingStatusCard({
             {shop?.razorpayLinkedAccountId || "Not created"}
           </p>
           <p className="mt-2 text-sm leading-6 opacity-85">
-            Status: {shop?.razorpayLinkedAccountStatus || "not_started"}
+            Status: {shop?.razorpayLinkedAccountStatus || "not_saved"}
           </p>
         </div>
         <div className="rounded-[22px] border border-current/10 bg-white/70 p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-70">
-            Route product
+            Online payments
           </p>
           <p className="mt-2 text-sm leading-6 opacity-85">
-            {shop?.razorpayProductId || "Not created"}
+            {shop?.onlinePaymentsEnabled ? "Enabled" : "Disabled"}
           </p>
           <p className="mt-2 text-sm leading-6 opacity-85">
-            Status: {shop?.razorpayProductStatus || "not_requested"}
+            Saved acc_xxx: {shop?.razorpayLinkedAccountId || "Not saved"}
           </p>
         </div>
       </div>

@@ -140,3 +140,7 @@ export function parseBankAccountNumber(value: unknown) {
 export function maskBankAccount(accountNumber: string) {
   return accountNumber.slice(-4);
 }
+
+export function maskPan(pan: string) {
+  return pan.slice(-4);
+}

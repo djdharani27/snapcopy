@@ -5,15 +5,12 @@ import { deleteS3Objects } from "@/lib/aws/s3";
 import {
   deleteShopWithRelatedData,
   getShopById,
-  resetShopRouteOnboarding,
   updateShopApproval,
   updateShopRouteDetails,
 } from "@/lib/firebase/firestore-admin";
 import { fetchRazorpayLinkedAccount } from "@/lib/payments/razorpay";
 import { parseRazorpayLinkedAccountId } from "@/lib/shops/validation";
 import { parseEmail } from "@/lib/shops/validation";
-import { approveShopAndRunRouteOnboarding } from "@/lib/shops/route-onboarding";
-
 export async function PATCH(
   request: Request,
   context: RouteContext<"/api/admin/shops/[shopId]">,
@@ -30,12 +27,16 @@ export async function PATCH(
     }
 
     if (action === "approve") {
-      const approvedShop = await approveShopAndRunRouteOnboarding(shop);
+      const approvedShop = await updateShopApproval({
+        shopId: shop.id,
+        approvalStatus: "approved",
+        onlinePaymentsEnabled: Boolean(shop.onlinePaymentsEnabled),
+        paymentOnboardingNote: String(shop.paymentOnboardingNote || "").trim(),
+      });
       return NextResponse.json({
         shop: approvedShop,
-        message: String(shop.razorpayLinkedAccountId || "").trim()
-          ? "Shop approved and the saved Razorpay Route onboarding was reconciled."
-          : "Shop approved and the full Razorpay Route onboarding flow completed.",
+        message:
+          "Shop approved. Create and activate the linked account manually in Razorpay Dashboard, then paste the verified acc_xxx here and turn online payments on.",
       });
     }
 
@@ -48,21 +49,15 @@ export async function PATCH(
     }
 
     if (action === "reset_route_onboarding") {
-      const resetShop = await resetShopRouteOnboarding({
-        shopId: shop.id,
-        onboardingStep: "not_started",
-        onboardingError: "",
-        paymentBlockedReason: "",
-      });
-
       return NextResponse.json({
-        shop: resetShop,
-        message: "Razorpay Route onboarding reset. Approve again to create a fresh linked account.",
-      });
+        error: "Legacy Razorpay Route onboarding reset has been disabled. Use manual linked-account onboarding only.",
+      }, { status: 410 });
     }
 
     const submittedLinkedAccountId = String(body.razorpayLinkedAccountId || "").trim();
     const submittedSettlementEmail = String(body.settlementEmail || "").trim();
+    const submittedPaymentOnboardingNote = String(body.paymentOnboardingNote || "").trim();
+    const submittedOnlinePaymentsEnabled = Boolean(body.onlinePaymentsEnabled);
     let verifiedLinkedAccount:
       | Awaited<ReturnType<typeof fetchRazorpayLinkedAccount>>
       | null = null;
@@ -85,6 +80,28 @@ export async function PATCH(
       }
     }
 
+    if (submittedOnlinePaymentsEnabled && !verifiedLinkedAccount && !submittedLinkedAccountId) {
+      throw new Error(
+        "Save and verify a Razorpay linked account id before turning online payments on.",
+      );
+    }
+
+    if (
+      submittedOnlinePaymentsEnabled &&
+      String(verifiedLinkedAccount?.status || body.razorpayLinkedAccountStatus || "")
+        .trim()
+        .toLowerCase() === "suspended"
+    ) {
+      throw new Error("Suspended linked accounts cannot be used for online payments.");
+    }
+
+    const nextLinkedAccountId = verifiedLinkedAccount?.id ?? body.razorpayLinkedAccountId;
+    const paymentBlockedReason = submittedOnlinePaymentsEnabled
+      ? ""
+      : nextLinkedAccountId
+        ? "Online payments are still turned off by admin."
+        : "";
+
     const updatedShop = await updateShopRouteDetails({
       shopId: shop.id,
       settlementEmail: submittedSettlementEmail
@@ -99,9 +116,9 @@ export async function PATCH(
       razorpayLinkedAccountStatusDescription:
         verifiedLinkedAccount?.status_details?.description ??
         body.razorpayLinkedAccountStatusDescription,
-      razorpayStakeholderId: body.razorpayStakeholderId,
-      razorpayProductId: body.razorpayProductId,
-      razorpayProductStatus: body.razorpayProductStatus,
+      onlinePaymentsEnabled: submittedOnlinePaymentsEnabled,
+      paymentOnboardingNote: submittedPaymentOnboardingNote,
+      paymentBlockedReason,
       onboardingStep: "",
       onboardingError: "",
       bankAccountHolderName: body.bankAccountHolderName,

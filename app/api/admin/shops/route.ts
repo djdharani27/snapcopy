@@ -51,6 +51,9 @@ export async function POST(request: Request) {
     const parsedState = parseRequiredText(state, "State");
     const parsedPostalCode = parsePostalCode(postalCode);
     const parsedPhone = parsePhone(phone);
+    const parsedLinkedAccountId = String(razorpayLinkedAccountId || "").trim()
+      ? parseRazorpayLinkedAccountId(razorpayLinkedAccountId)
+      : "";
 
     const shop = await createShop({
       ownerId: owner.uid,
@@ -63,7 +66,9 @@ export async function POST(request: Request) {
       phone: parsedPhone,
       description: String(description || "").trim(),
       services: parseServices(services),
-      razorpayLinkedAccountId: parseRazorpayLinkedAccountId(razorpayLinkedAccountId),
+      razorpayLinkedAccountId: parsedLinkedAccountId,
+      onlinePaymentsEnabled: false,
+      paymentOnboardingNote: "",
       pricing: {
         blackWhiteSingle: parsePrice(pricing?.blackWhiteSingle),
         blackWhiteDouble: parsePrice(pricing?.blackWhiteDouble),

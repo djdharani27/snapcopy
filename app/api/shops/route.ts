@@ -7,6 +7,7 @@ import {
   updateShop,
 } from "@/lib/firebase/firestore-admin";
 import {
+  maskBankAccount,
   parseAcceptedTerms,
   parseEmail,
   parseGoogleMapsUrl,
@@ -110,10 +111,12 @@ export async function POST(request: Request) {
       razorpayLinkedAccountStatus: "",
       bankAccountHolderName: parsedBankAccountHolderName,
       bankIfsc: parsedBankIfsc,
-      bankAccountLast4: "",
+      bankAccountLast4: maskBankAccount(parsedBankAccountNumber),
       pendingBankAccountNumber: parsedBankAccountNumber,
       pendingOwnerPan: parsedOwnerPan,
       pendingRouteTermsAccepted: true,
+      onlinePaymentsEnabled: false,
+      paymentOnboardingNote: "",
       pricing: shopPricing,
     });
 
@@ -206,10 +209,12 @@ export async function PATCH(request: Request) {
       razorpayProductStatus: String(existingShop.razorpayProductStatus || "").trim(),
       bankAccountHolderName: parsedBankAccountHolderName,
       bankIfsc: parsedBankIfsc,
-      bankAccountLast4: String(existingShop.bankAccountLast4 || "").trim(),
+      bankAccountLast4: maskBankAccount(parsedBankAccountNumber),
       pendingBankAccountNumber: parsedBankAccountNumber,
       pendingOwnerPan: parsedOwnerPan,
       pendingRouteTermsAccepted: true,
+      onlinePaymentsEnabled: false,
+      paymentOnboardingNote: String(existingShop.paymentOnboardingNote || "").trim(),
       pricing: {
         blackWhiteSingle: parsePrice(pricing?.blackWhiteSingle),
         blackWhiteDouble: parsePrice(pricing?.blackWhiteDouble),

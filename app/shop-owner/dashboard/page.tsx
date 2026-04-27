@@ -30,7 +30,7 @@ export default async function ShopOwnerDashboardPage() {
     <DashboardShell
       profile={profile}
       title={`${shop.shopName} orders`}
-      description="Manage paid print orders, update fulfilment status, and monitor Route payout readiness."
+      description="Manage paid print orders, update fulfilment status, and monitor manual Razorpay payout readiness."
       hideIntro
       navigation={<ShopOwnerNav active="orders" />}
       actions={
@@ -55,10 +55,10 @@ export default async function ShopOwnerDashboardPage() {
       }
     >
       <AutoRefresh shopId={shop.id} />
-      <RouteOnboardingStatusCard shop={shop} syncEndpoint="/api/shops/sync-status" />
+      <RouteOnboardingStatusCard shop={shop} />
       {!isPaymentReady ? (
         <div className="panel p-6">
-          <p className="text-sm text-slate-500">Route onboarding pending</p>
+          <p className="text-sm text-slate-500">Manual payout onboarding pending</p>
           <h2 className="mt-2 text-2xl font-semibold text-slate-900">Online payments are blocked</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">{getShopPaymentBlockedReason(shop)}</p>
         </div>

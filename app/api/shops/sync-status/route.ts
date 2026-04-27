@@ -1,37 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireApiRole } from "@/lib/auth/session";
-import { getShopByOwnerId } from "@/lib/firebase/firestore-admin";
-import { syncShopRazorpayStatus } from "@/lib/shops/route-onboarding";
 
 export async function POST() {
-  try {
-    const { decoded } = await requireApiRole("shop_owner");
-    const shop = await getShopByOwnerId(decoded.uid);
-
-    if (!shop) {
-      return NextResponse.json({ error: "Shop not found." }, { status: 404 });
-    }
-
-    const syncedShop = await syncShopRazorpayStatus(shop);
-
-    if (!syncedShop) {
-      return NextResponse.json({ error: "Shop not found after sync." }, { status: 404 });
-    }
-
-    const message =
-      syncedShop.razorpayProductStatus === "needs_clarification" &&
-      !syncedShop.razorpayProductRequirements?.length
-        ? "Requirements cleared. Waiting for Razorpay to reprocess activation."
-        : "Razorpay Route status synced.";
-
-    return NextResponse.json({
-      shop: syncedShop,
-      message,
-    });
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to sync Razorpay status." },
-      { status: 400 },
-    );
-  }
+  await requireApiRole("shop_owner");
+  return NextResponse.json(
+    {
+      error: "Legacy Razorpay Route status sync has been disabled. Use manual linked-account onboarding only.",
+    },
+    { status: 410 },
+  );
 }

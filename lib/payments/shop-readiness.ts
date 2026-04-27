@@ -4,51 +4,14 @@ function getNormalizedLinkedAccountStatus(value: unknown) {
   return String(value || "").trim().toLowerCase();
 }
 
-function getNormalizedProductStatus(value: unknown) {
-  return String(value || "").trim().toLowerCase();
-}
-
-function getBlockingRequirementSummary(
-  requirements?: Shop["razorpayProductRequirements"],
-) {
-  if (!Array.isArray(requirements) || requirements.length === 0) {
-    return "";
-  }
-
-  const blockingRequirements = requirements.filter((requirement) => {
-    const status = String(requirement?.status || "").trim().toLowerCase();
-    return !["resolved", "completed", "approved", "verified"].includes(status);
-  });
-
-  if (blockingRequirements.length === 0) {
-    return "";
-  }
-
-  return blockingRequirements
-    .map((requirement) =>
-      [
-        String(requirement?.fieldReference || "").trim(),
-        String(requirement?.reasonCode || "").trim(),
-        String(requirement?.status || "").trim(),
-      ]
-        .filter(Boolean)
-        .join(" - "),
-    )
-    .filter(Boolean)
-    .join("; ");
-}
-
 export function canShopReceiveOnlinePayments(
   shop?:
     | Pick<
         Shop,
         | "approvalStatus"
+        | "onlinePaymentsEnabled"
         | "razorpayLinkedAccountId"
-        | "razorpayStakeholderId"
-        | "razorpayProductId"
         | "razorpayLinkedAccountStatus"
-        | "razorpayProductStatus"
-        | "razorpayProductRequirements"
         | "paymentBlockedReason"
       >
     | null,
@@ -58,25 +21,14 @@ export function canShopReceiveOnlinePayments(
   }
 
   const linkedAccountId = String(shop?.razorpayLinkedAccountId || "").trim();
-  const stakeholderId = String(shop?.razorpayStakeholderId || "").trim();
-  const productId = String(shop?.razorpayProductId || "").trim();
   const linkedAccountStatus = getNormalizedLinkedAccountStatus(shop?.razorpayLinkedAccountStatus);
-  const productStatus = getNormalizedProductStatus(shop?.razorpayProductStatus);
-  const blockingRequirements = getBlockingRequirementSummary(shop?.razorpayProductRequirements);
+  const onlinePaymentsEnabled = Boolean(shop?.onlinePaymentsEnabled);
 
-  if (!linkedAccountId || !stakeholderId || !productId) {
+  if (!linkedAccountId || !onlinePaymentsEnabled) {
     return false;
   }
 
   if (linkedAccountStatus === "suspended") {
-    return false;
-  }
-
-  if (productStatus !== "activated") {
-    return false;
-  }
-
-  if (blockingRequirements) {
     return false;
   }
 
@@ -93,15 +45,11 @@ export function getShopPaymentBlockedReason(shop?: Shop | null) {
   }
 
   if (!String(shop.settlementEmail || "").trim()) {
-    return "Settlement email is required before Razorpay Route onboarding can continue.";
+    return "Settlement email is required before manual Razorpay onboarding can continue.";
   }
 
   if (!shop.razorpayLinkedAccountId) {
-    return "Razorpay linked account has not been created yet.";
-  }
-
-  if (!shop.razorpayStakeholderId) {
-    return "Razorpay stakeholder has not been created yet.";
+    return "Verified Razorpay linked account id has not been saved yet.";
   }
 
   const accountReason = String(shop.razorpayLinkedAccountStatusReason || "").trim();
@@ -118,27 +66,18 @@ export function getShopPaymentBlockedReason(shop?: Shop | null) {
     return `Linked account status is ${shop.razorpayLinkedAccountStatus}.`;
   }
 
-  if (!shop.razorpayProductId) {
-    return "Razorpay Route product has not been created yet.";
-  }
-
-  if (shop.razorpayProductStatus && getNormalizedProductStatus(shop.razorpayProductStatus) !== "activated") {
-    return `Route product status is ${shop.razorpayProductStatus}.`;
-  }
-
-  const blockingRequirements = getBlockingRequirementSummary(shop.razorpayProductRequirements);
-  if (blockingRequirements) {
-    return `Route requirements pending: ${blockingRequirements}`;
+  if (!shop.onlinePaymentsEnabled) {
+    return "Online payments are still turned off by admin.";
   }
 
   if (String(shop.paymentBlockedReason || "").trim()) {
     return String(shop.paymentBlockedReason || "").trim();
   }
 
-  return "Razorpay Route setup is not activated yet.";
+  return "Manual Razorpay onboarding is incomplete.";
 }
 
 export function getShopPaymentUnavailableMessage(shop?: Shop | null) {
   const reason = getShopPaymentBlockedReason(shop);
-  return `This shop cannot accept new online print orders until Razorpay Route onboarding is fully activated. ${reason}`;
+  return `This shop cannot accept new online print orders until manual Razorpay onboarding is completed. ${reason}`;
 }

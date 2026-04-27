@@ -27,63 +27,22 @@ function normalizeStatus(value?: string | null) {
   return String(value || "").trim().toLowerCase();
 }
 
-function formatRequirement(requirement: NonNullable<Shop["razorpayProductRequirements"]>[number]) {
-  const fieldReference = String(requirement?.fieldReference || "").trim();
-  const reasonCode = String(requirement?.reasonCode || "").trim().replace(/_/g, " ");
-  const status = String(requirement?.status || "").trim();
-
-  return [fieldReference, reasonCode, status].filter(Boolean).join(" - ");
-}
-
-function getRequirementStatus(
-  requirements: NonNullable<Shop["razorpayProductRequirements"]>,
-  patterns: string[],
-) {
-  const match = requirements.find((requirement) => {
-    const fieldReference = String(requirement?.fieldReference || "").toLowerCase();
-    return patterns.some((pattern) => fieldReference.includes(pattern));
-  });
-
-  if (!match) {
-    return "No issue reported";
-  }
-
-  return formatRequirement(match);
-}
-
 export function getRouteOnboardingState(shop?: Shop | null): RouteOnboardingState {
   const approvalStatus = shop?.approvalStatus || "";
   const linkedAccountStatus = normalizeStatus(shop?.razorpayLinkedAccountStatus);
-  const productStatus = normalizeStatus(shop?.razorpayProductStatus);
   const hasLinkedAccount = Boolean(shop?.razorpayLinkedAccountId);
-  const hasStakeholder = Boolean(shop?.razorpayStakeholderId);
-  const hasProduct = Boolean(shop?.razorpayProductId);
+  const onlinePaymentsEnabled = Boolean(shop?.onlinePaymentsEnabled);
   const isPaymentsReady = canShopReceiveOnlinePayments(shop);
-  const requirements =
-    shop?.razorpayProductRequirements
-      ?.map(formatRequirement)
-      .filter(Boolean) || [];
-  const ownerPanStatus =
-    shop?.razorpayOwnerPanStatus ||
-    getRequirementStatus(shop?.razorpayProductRequirements || [], ["pan"]);
-  const bankVerificationStatus =
-    shop?.razorpayBankVerificationStatus ||
-    getRequirementStatus(shop?.razorpayProductRequirements || [], [
-      "settlements.account_number",
-      "settlements.ifsc_code",
-      "settlements.beneficiary_name",
-      "account_number",
-      "ifsc",
-      "beneficiary",
-    ]);
-  const routeTermsStatus = shop?.razorpayRouteTermsAccepted
-    ? "Accepted"
-    : getRequirementStatus(shop?.razorpayProductRequirements || [], ["tnc", "terms"]);
+  const requirements: string[] = [];
+  const ownerPanStatus = String(shop?.pendingOwnerPan || "").trim()
+    ? "Submitted"
+    : "Not submitted";
+  const bankVerificationStatus = shop?.bankAccountLast4
+    ? `Submitted - xxxx${shop.bankAccountLast4}`
+    : "Not submitted";
+  const routeTermsStatus = shop?.pendingRouteTermsAccepted ? "Accepted" : "Pending";
   const paymentBlockedReason = getShopPaymentBlockedReason(shop);
-  const showCorrectionScreen =
-    productStatus === "needs_clarification" ||
-    linkedAccountStatus === "under_review" ||
-    normalizeStatus(shop?.razorpayLinkedAccountStatusReason) === "rule_execution_failed";
+  const showCorrectionScreen = false;
 
   const steps: RouteProgressStep[] = [
     {
@@ -99,28 +58,28 @@ export function getRouteOnboardingState(shop?: Shop | null): RouteOnboardingStat
           ? "Shop details were approved."
           : approvalStatus === "rejected"
             ? "Shop details were rejected and need resubmission."
-            : "Waiting for admin approval before manual Route setup begins.",
+            : "Waiting for admin approval before manual payout setup begins.",
     },
     {
       label: "Linked account",
       status: hasLinkedAccount ? "done" : approvalStatus === "approved" ? "current" : "pending",
       detail: hasLinkedAccount
         ? `Linked account status: ${shop?.razorpayLinkedAccountStatus || "created"}.`
-        : "Linked account has not been created yet.",
+        : "Admin has not saved a verified linked account id yet.",
     },
     {
-      label: "Stakeholder",
-      status: hasStakeholder ? "done" : hasLinkedAccount ? "current" : "pending",
-      detail: hasStakeholder
-        ? "Primary stakeholder has been recorded."
-        : "Stakeholder/KYC step is still pending manual setup.",
+      label: "Verification",
+      status: hasLinkedAccount ? "done" : approvalStatus === "approved" ? "current" : "pending",
+      detail: hasLinkedAccount
+        ? "Admin has verified and saved the linked account id from Razorpay Dashboard."
+        : "Admin must create the linked account manually in Razorpay Dashboard and paste the acc_xxx here.",
     },
     {
-      label: "Route product",
-      status: isPaymentsReady ? "done" : hasProduct ? "current" : "pending",
-      detail: hasProduct
-        ? `Route product status: ${shop?.razorpayProductStatus || "requested"}.`
-        : "Route product has not been added manually yet.",
+      label: "Online payments",
+      status: isPaymentsReady ? "done" : onlinePaymentsEnabled ? "current" : "pending",
+      detail: onlinePaymentsEnabled
+        ? "Online payments are enabled for checkout."
+        : "Online payments are still off until an admin turns them on.",
     },
   ];
 
@@ -129,7 +88,7 @@ export function getRouteOnboardingState(shop?: Shop | null): RouteOnboardingStat
       tone: "success",
       title: "Online payments are active",
       description:
-        "Your linked account, stakeholder, and Route product are fully activated. Customers can pay online and payouts can be routed automatically.",
+        "Your shop is approved, a linked account has been saved, and online payments are enabled. Customers can now pay online.",
       steps,
       requirements,
       paymentBlockedReason: "",
@@ -149,8 +108,8 @@ export function getRouteOnboardingState(shop?: Shop | null): RouteOnboardingStat
           : "Waiting for admin approval",
       description:
         approvalStatus === "rejected"
-          ? "Update your shop details and resubmit them before manual Route setup can continue."
-          : "The shop is waiting for approval. Admins will complete the manual Route setup from the dashboard after approval.",
+          ? "Update your shop details and resubmit them before manual onboarding can continue."
+          : "The shop is waiting for admin approval. After approval, admins will create the linked account manually in Razorpay Dashboard.",
       steps,
       requirements,
       paymentBlockedReason,
@@ -161,28 +120,12 @@ export function getRouteOnboardingState(shop?: Shop | null): RouteOnboardingStat
     };
   }
 
-  if (productStatus === "needs_clarification") {
-    return {
-      tone: "danger",
-      title: "Razorpay needs clarification",
-      description:
-        "Online payments are blocked until the manual Route setup issues below are resolved and an admin updates the product status to activated.",
-      steps,
-      requirements,
-      paymentBlockedReason,
-      ownerPanStatus,
-      bankVerificationStatus,
-      routeTermsStatus,
-      showCorrectionScreen,
-    };
-  }
-
-  if (productStatus === "under_review" || linkedAccountStatus === "under_review") {
+  if (linkedAccountStatus === "under_review") {
     return {
       tone: "warning",
-      title: "Razorpay is reviewing the onboarding",
+      title: "Linked account is under review",
       description:
-        "Online payments stay blocked while Razorpay reviews the manually entered linked account and Route product details.",
+        "Online payments stay blocked while Razorpay reviews the linked account that was created manually in the dashboard.",
       steps,
       requirements,
       paymentBlockedReason,
@@ -197,7 +140,7 @@ export function getRouteOnboardingState(shop?: Shop | null): RouteOnboardingStat
     tone: "warning",
     title: "Online payments are not active yet",
     description:
-      "The shop cannot receive new customer orders until the linked account and Route product are activated. Ask an admin to finish the pending Route onboarding steps.",
+      "The shop cannot receive new customer orders until an admin saves a verified linked account id and turns online payments on.",
     steps,
     requirements,
     paymentBlockedReason,

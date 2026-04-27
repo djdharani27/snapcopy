@@ -96,9 +96,9 @@ export function ShopSetupForm({
         </h1>
         <p className="mt-3 text-sm leading-7 text-slate-600">
           Set your shop details, services, settlement details, and base print prices. Admin
-          approval and Route activation are required before customers can place paid orders with
-          this shop. Razorpay linked account and Route product details are added by admins from the
-          dashboard after approval.
+          approval and manual Razorpay linked-account setup are required before customers can place
+          paid orders with this shop. Admins create the linked account in Razorpay Dashboard after
+          approval, paste the verified acc_xxx here, and then turn online payments on.
         </p>
         <p className="mt-2 text-xs leading-6 text-slate-500">
           Your Firebase login email stays separate and is only used for platform sign-in.
@@ -119,7 +119,6 @@ export function ShopSetupForm({
             <RouteOnboardingStatusCard
               shop={shop}
               compact
-              syncEndpoint={shop.approvalStatus === "approved" ? "/api/shops/sync-status" : undefined}
             />
           </div>
         ) : null}
@@ -271,7 +270,9 @@ export function ShopSetupForm({
                 Linked account: {shop?.razorpayLinkedAccountId}
               </p>
               <p className="mt-2">Status: {shop?.razorpayLinkedAccountStatus || "created"}</p>
-              <p className="mt-2">Route product: {shop?.razorpayProductStatus || "not_requested"}</p>
+              <p className="mt-2">
+                Online payments: {shop?.onlinePaymentsEnabled ? "enabled" : "disabled"}
+              </p>
               <p className="mt-2">Beneficiary: {shop?.bankAccountHolderName || "-"}</p>
               <p className="mt-2">
                 Bank: {shop?.bankIfsc || "-"} / xxxx{shop?.bankAccountLast4 || ""}
@@ -288,7 +289,7 @@ export function ShopSetupForm({
             <div className="md:col-span-2 rounded-[24px] border border-[#eadfd3] bg-[rgba(255,248,241,0.82)] p-4 text-sm text-slate-600">
               {hasLinkedAccount
                 ? "Admin has already added Razorpay account details for this shop. Update the payout fields below if the admin asks you to correct bank or PAN information."
-                : "Admin approval is required before admins add the Razorpay linked account and Route product details. Customers cannot place paid orders until Route is activated."}
+                : "Admin approval is required before admins create the linked account manually in Razorpay Dashboard. Customers cannot place paid orders until the verified acc_xxx is saved and online payments are enabled."}
             </div>
 
             <div>
@@ -384,7 +385,7 @@ export function ShopSetupForm({
               />
               <span>
                 I accept the Razorpay Route onboarding and settlement terms. Admin can use this
-                acceptance while configuring the shop manually in Razorpay.
+                acceptance while configuring the shop manually in Razorpay Dashboard.
               </span>
             </label>
           </div>
