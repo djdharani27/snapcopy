@@ -31,6 +31,7 @@ export async function PATCH(
         shopId: shop.id,
         approvalStatus: "approved",
         onlinePaymentsEnabled: Boolean(shop.onlinePaymentsEnabled),
+        adminVerifiedRazorpayAccount: Boolean(shop.adminVerifiedRazorpayAccount),
         paymentOnboardingNote: String(shop.paymentOnboardingNote || "").trim(),
       });
       return NextResponse.json({
@@ -58,6 +59,7 @@ export async function PATCH(
     const submittedSettlementEmail = String(body.settlementEmail || "").trim();
     const submittedPaymentOnboardingNote = String(body.paymentOnboardingNote || "").trim();
     const submittedOnlinePaymentsEnabled = Boolean(body.onlinePaymentsEnabled);
+    const submittedAdminVerifiedRazorpayAccount = Boolean(body.adminVerifiedRazorpayAccount);
     let verifiedLinkedAccount:
       | Awaited<ReturnType<typeof fetchRazorpayLinkedAccount>>
       | null = null;
@@ -86,21 +88,11 @@ export async function PATCH(
       );
     }
 
-    if (
-      submittedOnlinePaymentsEnabled &&
-      String(verifiedLinkedAccount?.status || body.razorpayLinkedAccountStatus || "")
-        .trim()
-        .toLowerCase() === "suspended"
-    ) {
-      throw new Error("Suspended linked accounts cannot be used for online payments.");
+    if (submittedOnlinePaymentsEnabled && !submittedAdminVerifiedRazorpayAccount) {
+      throw new Error(
+        "Confirm that the linked account is Activated/Verified in Razorpay Dashboard before turning online payments on.",
+      );
     }
-
-    const nextLinkedAccountId = verifiedLinkedAccount?.id ?? body.razorpayLinkedAccountId;
-    const paymentBlockedReason = submittedOnlinePaymentsEnabled
-      ? ""
-      : nextLinkedAccountId
-        ? "Online payments are still turned off by admin."
-        : "";
 
     const updatedShop = await updateShopRouteDetails({
       shopId: shop.id,
@@ -117,8 +109,9 @@ export async function PATCH(
         verifiedLinkedAccount?.status_details?.description ??
         body.razorpayLinkedAccountStatusDescription,
       onlinePaymentsEnabled: submittedOnlinePaymentsEnabled,
+      adminVerifiedRazorpayAccount: submittedAdminVerifiedRazorpayAccount,
       paymentOnboardingNote: submittedPaymentOnboardingNote,
-      paymentBlockedReason,
+      paymentBlockedReason: "",
       onboardingStep: "",
       onboardingError: "",
       bankAccountHolderName: body.bankAccountHolderName,
@@ -126,7 +119,12 @@ export async function PATCH(
       bankAccountLast4: body.bankAccountLast4,
     });
 
-    return NextResponse.json({ shop: updatedShop });
+    const message =
+      submittedAdminVerifiedRazorpayAccount && submittedOnlinePaymentsEnabled
+        ? "Linked account verified in Razorpay Dashboard. Online payments enabled."
+        : undefined;
+
+    return NextResponse.json({ shop: updatedShop, message });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to update shop." },

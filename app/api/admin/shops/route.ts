@@ -10,6 +10,7 @@ import {
   parseRequiredText,
   parseRazorpayLinkedAccountId,
   parseServices,
+  validateShopPricing,
 } from "@/lib/shops/validation";
 
 export async function POST(request: Request) {
@@ -69,12 +70,12 @@ export async function POST(request: Request) {
       razorpayLinkedAccountId: parsedLinkedAccountId,
       onlinePaymentsEnabled: false,
       paymentOnboardingNote: "",
-      pricing: {
+      pricing: validateShopPricing({
         blackWhiteSingle: parsePrice(pricing?.blackWhiteSingle),
         blackWhiteDouble: parsePrice(pricing?.blackWhiteDouble),
         colorSingle: parsePrice(pricing?.colorSingle),
         colorDouble: parsePrice(pricing?.colorDouble),
-      },
+      }),
     });
 
     return NextResponse.json({ shop });

@@ -16,6 +16,7 @@ import {
   parsePostalCode,
   parseRequiredText,
   parseServices,
+  validateShopPricing,
 } from "@/lib/shops/validation";
 
 export async function GET() {
@@ -61,12 +62,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const shopPricing = {
+    const shopPricing = validateShopPricing({
       blackWhiteSingle: parsePrice(pricing?.blackWhiteSingle),
       blackWhiteDouble: parsePrice(pricing?.blackWhiteDouble),
       colorSingle: parsePrice(pricing?.colorSingle),
       colorDouble: parsePrice(pricing?.colorDouble),
-    };
+    });
 
     const parsedShopName = String(shopName).trim();
     const parsedAddress = String(address).trim();
@@ -116,6 +117,7 @@ export async function POST(request: Request) {
       pendingOwnerPan: parsedOwnerPan,
       pendingRouteTermsAccepted: true,
       onlinePaymentsEnabled: false,
+      adminVerifiedRazorpayAccount: false,
       paymentOnboardingNote: "",
       pricing: shopPricing,
     });
@@ -214,13 +216,14 @@ export async function PATCH(request: Request) {
       pendingOwnerPan: parsedOwnerPan,
       pendingRouteTermsAccepted: true,
       onlinePaymentsEnabled: false,
+      adminVerifiedRazorpayAccount: false,
       paymentOnboardingNote: String(existingShop.paymentOnboardingNote || "").trim(),
-      pricing: {
+      pricing: validateShopPricing({
         blackWhiteSingle: parsePrice(pricing?.blackWhiteSingle),
         blackWhiteDouble: parsePrice(pricing?.blackWhiteDouble),
         colorSingle: parsePrice(pricing?.colorSingle),
         colorDouble: parsePrice(pricing?.colorDouble),
-      },
+      }),
     });
 
     return NextResponse.json({

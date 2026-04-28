@@ -51,7 +51,7 @@ export default async function ShopOwnerRevenuePage() {
     const key = getDateKey(order.paidAt || order.createdAt);
     const current = dailyMetrics.get(key) ?? { orderCount: 0, revenue: 0 };
     current.orderCount += 1;
-    current.revenue += Number(order.shopEarningPaise || 0) / 100;
+    current.revenue += Number((order.transferableAmountPaise ?? order.shopEarningPaise) || 0) / 100;
     dailyMetrics.set(key, current);
   }
 
@@ -76,7 +76,7 @@ export default async function ShopOwnerRevenuePage() {
       actions={
         <>
           <RefreshButton />
-          <Link href="/shop-owner/setup" className="icon-btn" aria-label="Shop settings" title="Shop settings">
+          <Link href="/shop-owner/settings" className="icon-btn" aria-label="Shop settings" title="Shop settings">
             <svg
               aria-hidden="true"
               viewBox="0 0 24 24"
@@ -100,7 +100,7 @@ export default async function ShopOwnerRevenuePage() {
           <p className="mt-2 text-3xl font-semibold text-slate-900">{totalOrders}</p>
         </div>
         <div className="panel p-5">
-          <p className="text-sm text-slate-500">Gross routed revenue</p>
+          <p className="text-sm text-slate-500">Net routed revenue</p>
           <p className="mt-2 text-3xl font-semibold text-slate-900">{formatCurrency(totalRevenue)}</p>
         </div>
       </div>
@@ -114,7 +114,7 @@ export default async function ShopOwnerRevenuePage() {
           <div className="border-b border-slate-200 px-5 py-4">
             <h2 className="text-xl font-semibold text-slate-900">Daily totals</h2>
             <p className="mt-1 text-sm text-slate-600">
-              Amounts use the trusted order total stored server-side in paise.
+              Amounts show the net amount routed to your linked account after gateway charges.
             </p>
           </div>
           <div className="overflow-x-auto">

@@ -107,7 +107,9 @@ export function RouteOnboardingStatusCard({
             Online payments
           </p>
           <p className="mt-2 text-sm leading-6 opacity-85">
-            {shop?.onlinePaymentsEnabled ? "Enabled" : "Disabled"}
+            {shop?.adminVerifiedRazorpayAccount && shop?.onlinePaymentsEnabled
+              ? "Online payments are active"
+              : "Waiting for admin payment verification"}
           </p>
           <p className="mt-2 text-sm leading-6 opacity-85">
             Saved acc_xxx: {shop?.razorpayLinkedAccountId || "Not saved"}

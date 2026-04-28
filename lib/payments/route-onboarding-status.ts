@@ -32,6 +32,7 @@ export function getRouteOnboardingState(shop?: Shop | null): RouteOnboardingStat
   const linkedAccountStatus = normalizeStatus(shop?.razorpayLinkedAccountStatus);
   const hasLinkedAccount = Boolean(shop?.razorpayLinkedAccountId);
   const onlinePaymentsEnabled = Boolean(shop?.onlinePaymentsEnabled);
+  const adminVerifiedRazorpayAccount = Boolean(shop?.adminVerifiedRazorpayAccount);
   const isPaymentsReady = canShopReceiveOnlinePayments(shop);
   const requirements: string[] = [];
   const ownerPanStatus = String(shop?.pendingOwnerPan || "").trim()
@@ -69,16 +70,24 @@ export function getRouteOnboardingState(shop?: Shop | null): RouteOnboardingStat
     },
     {
       label: "Verification",
-      status: hasLinkedAccount ? "done" : approvalStatus === "approved" ? "current" : "pending",
-      detail: hasLinkedAccount
-        ? "Admin has verified and saved the linked account id from Razorpay Dashboard."
-        : "Admin must create the linked account manually in Razorpay Dashboard and paste the acc_xxx here.",
+      status: adminVerifiedRazorpayAccount
+        ? "done"
+        : hasLinkedAccount && approvalStatus === "approved"
+          ? "current"
+          : "pending",
+      detail: adminVerifiedRazorpayAccount
+        ? "Admin confirmed in Razorpay Dashboard that this linked account is activated/verified."
+        : hasLinkedAccount
+          ? "Waiting for admin payment verification in Razorpay Dashboard."
+          : "Admin must create the linked account manually in Razorpay Dashboard and paste the acc_xxx here.",
     },
     {
       label: "Online payments",
       status: isPaymentsReady ? "done" : onlinePaymentsEnabled ? "current" : "pending",
       detail: onlinePaymentsEnabled
-        ? "Online payments are enabled for checkout."
+        ? adminVerifiedRazorpayAccount
+          ? "Online payments are enabled for checkout."
+          : "Online payments are toggled on, but admin payment verification is still required."
         : "Online payments are still off until an admin turns them on.",
     },
   ];
@@ -138,9 +147,9 @@ export function getRouteOnboardingState(shop?: Shop | null): RouteOnboardingStat
 
   return {
     tone: "warning",
-    title: "Online payments are not active yet",
+    title: "Waiting for admin payment verification",
     description:
-      "The shop cannot receive new customer orders until an admin saves a verified linked account id and turns online payments on.",
+      "The shop cannot receive new customer orders until an admin confirms the linked account is activated/verified in Razorpay Dashboard and turns online payments on.",
     steps,
     requirements,
     paymentBlockedReason,

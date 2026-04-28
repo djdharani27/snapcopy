@@ -1,4 +1,4 @@
-import type { OrderStatus } from "@/types";
+import type { OrderStatus, PaymentStatus } from "@/types";
 
 export function formatDate(value?: string | null) {
   if (!value) return "-";
@@ -49,19 +49,23 @@ export function formatTrackingId(
   return fallbackOrderId || "-";
 }
 
-export function statusLabel(status: OrderStatus) {
+export function statusLabel(status: OrderStatus, paymentStatus?: PaymentStatus | null) {
   if (status === "confirmed") return "Confirmed";
   if (status === "in_progress") return "In progress";
   if (status === "ready_for_pickup") return "Ready for pickup";
   if (status === "completed") return "Completed";
+  if (paymentStatus === "quote_pending") return "Awaiting quote";
+  if (paymentStatus === "ready_to_pay") return "Ready to pay";
   return "Pending payment";
 }
 
-export function customerStatusLabel(status: OrderStatus) {
+export function customerStatusLabel(status: OrderStatus, paymentStatus?: PaymentStatus | null) {
   if (status === "confirmed") return "Payment received";
   if (status === "in_progress") return "Printing in progress";
   if (status === "ready_for_pickup") return "Ready for pickup";
   if (status === "completed") return "Picked up";
+  if (paymentStatus === "quote_pending") return "Waiting for shop price";
+  if (paymentStatus === "ready_to_pay") return "Ready to pay";
   return "Awaiting payment";
 }
 

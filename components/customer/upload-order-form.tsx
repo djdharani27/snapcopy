@@ -59,6 +59,10 @@ export function UploadOrderForm({
         throw new Error("Select a shop before placing the order.");
       }
 
+      if (!selectedShop) {
+        throw new Error("Select a valid shop before placing the order.");
+      }
+
       if (files.length === 0) throw new Error("Add at least one file.");
       if (files.length > MAX_FILES_PER_ORDER) {
         throw new Error(`You can upload up to ${MAX_FILES_PER_ORDER} files.`);
@@ -139,7 +143,8 @@ export function UploadOrderForm({
         </h2>
         <p className="mt-3 text-sm leading-7 text-slate-600">
           Add files, pick the shop, confirm the print specs, then send. Formats: PDF, DOC, DOCX,
-          PNG, JPG. Maximum 10 files, 15 MB each.
+          PNG, JPG. Maximum 10 files, 15 MB each. The shop will review the order and set the final
+          payment amount before you pay.
         </p>
       </div>
 
@@ -327,7 +332,7 @@ export function UploadOrderForm({
       {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
       <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-[#776b61]">
-          The backend locks pricing from the shop&apos;s saved rate card before checkout.
+          Orders are submitted first. The shop owner will review your files and set the final amount before payment.
         </p>
         <button
           type="submit"
@@ -344,7 +349,7 @@ export function UploadOrderForm({
             <h3 className="text-xl font-semibold text-slate-900">Order sent</h3>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               Your documents were sent to {submittedShop?.shopName || "the selected shop"}. Click
-              OK to go back to your orders.
+              OK to go back to your orders. Payment will unlock after the shop sets the final amount.
             </p>
             {createdTrackingCode ? (
               <p className="mt-3 text-sm text-slate-700">

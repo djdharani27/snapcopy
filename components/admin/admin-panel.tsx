@@ -3,12 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
-import type { BillingAuditLog, BillingConfig, OrderWithFiles, Shop, UserProfile } from "@/types";
+import type {
+  AdminShopSensitivePayoutDetails,
+  AdminShopSummary,
+  BillingAuditLog,
+  BillingConfig,
+  OrderWithFiles,
+  UserProfile,
+} from "@/types";
 import { formatCurrency, formatDate, formatPaiseToRupees, formatTrackingId } from "@/lib/utils/format";
 import { canShopReceiveOnlinePayments } from "@/lib/payments/shop-readiness";
 
 interface AdminPanelProps {
-  shops: Shop[];
+  shops: AdminShopSummary[];
   shopOwners: UserProfile[];
   billing: BillingConfig;
   billingAuditLogs: BillingAuditLog[];
@@ -33,7 +40,66 @@ interface ShopRouteFormState {
   bankIfsc: string;
   bankAccountLast4: string;
   onlinePaymentsEnabled: boolean;
+  adminVerifiedRazorpayAccount: boolean;
   paymentOnboardingNote: string;
+}
+
+interface SensitiveFieldConfig {
+  key:
+    | "ownerName"
+    | "settlementEmail"
+    | "phone"
+    | "shopName"
+    | "fullAddress"
+    | "ownerPan"
+    | "bankAccountHolderName"
+    | "bankAccountNumber"
+    | "bankIfsc";
+  label: string;
+  value: string;
+}
+
+function buildSensitiveFields(
+  shop: AdminShopSummary,
+  details: AdminShopSensitivePayoutDetails,
+): SensitiveFieldConfig[] {
+  return [
+    { key: "ownerName", label: "Owner name", value: details.ownerName },
+    { key: "settlementEmail", label: "Email", value: details.settlementEmail },
+    { key: "phone", label: "Phone", value: details.phone },
+    { key: "shopName", label: "Business name", value: shop.shopName },
+    { key: "fullAddress", label: "Address", value: details.fullAddress },
+    { key: "ownerPan", label: "PAN", value: details.ownerPan },
+    {
+      key: "bankAccountHolderName",
+      label: "Bank account holder name",
+      value: details.bankAccountHolderName,
+    },
+    {
+      key: "bankAccountNumber",
+      label: "Bank account number",
+      value: details.bankAccountNumber,
+    },
+    { key: "bankIfsc", label: "IFSC", value: details.bankIfsc },
+  ];
+}
+
+function buildRazorpayCopyBlock(
+  shop: AdminShopSummary,
+  details: AdminShopSensitivePayoutDetails,
+) {
+  return [
+    `Shop name: ${shop.shopName}`,
+    `Owner name: ${details.ownerName}`,
+    `Email: ${details.settlementEmail}`,
+    `Phone: ${details.phone}`,
+    `Business type: ${details.businessType}`,
+    `Address: ${details.fullAddress}`,
+    `PAN: ${details.ownerPan}`,
+    `Bank account holder: ${details.bankAccountHolderName}`,
+    `Bank account number: ${details.bankAccountNumber}`,
+    `IFSC: ${details.bankIfsc}`,
+  ].join("\n");
 }
 
 function getBillingFormState(billing: BillingConfig): BillingFormState {
@@ -65,7 +131,7 @@ function formatAuditDate(value?: string | null) {
   return new Date(value).toLocaleString();
 }
 
-function getShopRouteFormState(shop: Shop): ShopRouteFormState {
+function getShopRouteFormState(shop: AdminShopSummary): ShopRouteFormState {
   return {
     settlementEmail: String(shop.settlementEmail || ""),
     razorpayLinkedAccountId: String(shop.razorpayLinkedAccountId || ""),
@@ -74,15 +140,16 @@ function getShopRouteFormState(shop: Shop): ShopRouteFormState {
     bankIfsc: String(shop.bankIfsc || ""),
     bankAccountLast4: String(shop.bankAccountLast4 || ""),
     onlinePaymentsEnabled: Boolean(shop.onlinePaymentsEnabled),
+    adminVerifiedRazorpayAccount: Boolean(shop.adminVerifiedRazorpayAccount),
     paymentOnboardingNote: String(shop.paymentOnboardingNote || ""),
   };
 }
 
-function getMaskedSubmittedPan(shop: Shop) {
+function getMaskedSubmittedPan(shop: AdminShopSummary) {
   return String(shop.panLast4Masked || "").trim();
 }
 
-function getMaskedSubmittedBankAccount(shop: Shop) {
+function getMaskedSubmittedBankAccount(shop: AdminShopSummary) {
   return String(shop.bankAccountLast4Masked || shop.bankAccountLast4 || "").trim();
 }
 
@@ -90,7 +157,7 @@ function formatServicesList(services: string[]) {
   return services.length ? services.join(", ") : "-";
 }
 
-function getApprovalBadge(shop: Shop) {
+function getApprovalBadge(shop: AdminShopSummary) {
   switch (shop.approvalStatus) {
     case "pending_approval":
       return {
@@ -110,7 +177,7 @@ function getApprovalBadge(shop: Shop) {
   }
 }
 
-function getRouteBadge(shop: Shop) {
+function getRouteBadge(shop: AdminShopSummary) {
   if (!shop.razorpayLinkedAccountId) {
     return {
       label: "Account Not Saved",
@@ -138,6 +205,121 @@ function getRouteBadge(shop: Shop) {
   };
 }
 
+function getLinkedAccountApiStatusWarning(
+  status?: string | null,
+  adminVerifiedRazorpayAccount?: boolean,
+) {
+  if (adminVerifiedRazorpayAccount) {
+    return "";
+  }
+
+  const normalizedStatus = String(status || "").trim().toLowerCase();
+
+  if (!normalizedStatus || normalizedStatus === "activated") {
+    return "";
+  }
+
+  return `API status is ${status}. Only continue if Razorpay Dashboard shows this account is verified/activated.`;
+}
+
+function isZeroPricedOrder(order: Pick<OrderWithFiles, "printCostPaise" | "totalAmountPaise">) {
+  return (
+    order.printCostPaise !== null &&
+    order.printCostPaise !== undefined &&
+    (Number(order.printCostPaise) <= 0 ||
+      (order.totalAmountPaise !== null &&
+        order.totalAmountPaise !== undefined &&
+        Number(order.totalAmountPaise) <= 0))
+  );
+}
+
+function SensitivePayoutDetailsPanel(props: {
+  shop: AdminShopSummary;
+  details?: AdminShopSensitivePayoutDetails;
+  error?: string;
+  isLoading: boolean;
+  copiedKey: string | null;
+  onReveal: (shopId: string) => Promise<void>;
+  onCopyField: (shopId: string, fieldKey: string, value: string) => Promise<void>;
+  onCopyAll: (shop: AdminShopSummary, details: AdminShopSensitivePayoutDetails) => Promise<void>;
+}) {
+  const { shop, details, error, isLoading, copiedKey, onReveal, onCopyField, onCopyAll } = props;
+  const fields = details ? buildSensitiveFields(shop, details) : [];
+
+  return (
+    <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-900">
+            Sensitive payout details
+          </p>
+          <p className="mt-2 max-w-3xl text-xs leading-5 text-amber-900/80">
+            Full PAN and bank account details stay hidden until an admin explicitly reveals them
+            for manual Razorpay onboarding.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void onReveal(shop.id)}
+          disabled={isLoading}
+          className="btn-secondary"
+          suppressHydrationWarning
+        >
+          {isLoading
+            ? "Revealing..."
+            : details
+              ? "Refresh revealed details"
+              : "Reveal payout details"}
+        </button>
+      </div>
+      {error ? <p className="mt-3 text-sm text-rose-700">{error}</p> : null}
+      {details ? (
+        <>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {fields.map((field) => (
+              <div
+                key={field.key}
+                className="rounded-xl border border-white/80 bg-white/90 p-3 text-sm text-slate-700"
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  {field.label}
+                </p>
+                <div className="mt-2 flex items-start justify-between gap-3">
+                  <p className="min-w-0 flex-1 whitespace-pre-wrap break-all text-slate-900">
+                    {field.value || "-"}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void onCopyField(shop.id, field.key, field.value)}
+                    disabled={!field.value}
+                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    suppressHydrationWarning
+                  >
+                    {copiedKey === `${shop.id}:${field.key}` ? "Copied" : "Copy"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => void onCopyAll(shop, details)}
+              className="btn-secondary"
+              suppressHydrationWarning
+            >
+              {copiedKey === `${shop.id}:all` ? "Copied all" : "Copy all for Razorpay"}
+            </button>
+            <p className="text-xs text-slate-600">
+              Route terms accepted: {details.routeTermsAccepted ? "Yes" : "No"}
+            </p>
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 export function AdminPanel({
   shops,
   shopOwners,
@@ -161,6 +343,14 @@ export function AdminPanel({
   const [billingMessage, setBillingMessage] = useState("");
   const [billingLoading, setBillingLoading] = useState(false);
   const [resettingBilling, setResettingBilling] = useState(false);
+  const [loadingSensitiveShopId, setLoadingSensitiveShopId] = useState<string | null>(null);
+  const [sensitiveDetailsByShopId, setSensitiveDetailsByShopId] = useState<
+    Record<string, AdminShopSensitivePayoutDetails>
+  >({});
+  const [sensitiveErrorsByShopId, setSensitiveErrorsByShopId] = useState<Record<string, string>>(
+    {},
+  );
+  const [copiedSensitiveKey, setCopiedSensitiveKey] = useState<string | null>(null);
   const reviewSubmitLockRef = useRef<string | null>(null);
   const [billingForm, setBillingForm] = useState<BillingFormState>(() =>
     normalizeBillingFormState(getBillingFormState(billing)),
@@ -177,6 +367,19 @@ export function AdminPanel({
       Object.fromEntries(shops.map((shop) => [shop.id, getShopRouteFormState(shop)])),
     );
   }, [billing, shops]);
+
+  useEffect(() => {
+    setSensitiveDetailsByShopId((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(([shopId]) => shops.some((shop) => shop.id === shopId)),
+      ),
+    );
+    setSensitiveErrorsByShopId((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(([shopId]) => shops.some((shop) => shop.id === shopId)),
+      ),
+    );
+  }, [shops]);
 
   async function getAdminRequestHeaders(contentType?: string) {
     const headers = new Headers();
@@ -210,6 +413,64 @@ export function AdminPanel({
       headers,
       credentials: "same-origin",
     });
+  }
+
+  async function copySensitiveValue(shopId: string, fieldKey: string, value: string) {
+    if (!value) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(value);
+    const nextCopiedKey = `${shopId}:${fieldKey}`;
+    setCopiedSensitiveKey(nextCopiedKey);
+    window.setTimeout(() => {
+      setCopiedSensitiveKey((current) => (current === nextCopiedKey ? null : current));
+    }, 2000);
+  }
+
+  async function handleRevealSensitivePayoutDetails(shopId: string) {
+    const confirmed = window.confirm(
+      "Sensitive PAN and bank details will be shown. Use only for Razorpay onboarding.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setLoadingSensitiveShopId(shopId);
+    setSensitiveErrorsByShopId((current) => ({
+      ...current,
+      [shopId]: "",
+    }));
+
+    try {
+      const response = await adminFetch(`/api/admin/shops/${shopId}/sensitive-payout-details`);
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Unable to load sensitive payout details.");
+      }
+
+      setSensitiveDetailsByShopId((current) => ({
+        ...current,
+        [shopId]: payload.sensitivePayoutDetails as AdminShopSensitivePayoutDetails,
+      }));
+    } catch (error) {
+      setSensitiveErrorsByShopId((current) => ({
+        ...current,
+        [shopId]:
+          error instanceof Error ? error.message : "Unable to load sensitive payout details.",
+      }));
+    } finally {
+      setLoadingSensitiveShopId(null);
+    }
+  }
+
+  async function handleCopyAllSensitivePayoutDetails(
+    shop: AdminShopSummary,
+    details: AdminShopSensitivePayoutDetails,
+  ) {
+    await copySensitiveValue(shop.id, "all", buildRazorpayCopyBlock(shop, details));
   }
 
   async function handleCreateShop(event: React.FormEvent<HTMLFormElement>) {
@@ -386,6 +647,7 @@ export function AdminPanel({
   async function handleSaveRouteDetails(shopId: string) {
     setSavingRouteShopId(shopId);
     setFormError("");
+    setBillingMessage("");
 
     try {
       const response = await adminFetch(`/api/admin/shops/${shopId}`, {
@@ -395,6 +657,10 @@ export function AdminPanel({
       const payload = await response.json();
       if (!response.ok) {
         throw new Error(payload.error || "Unable to save Razorpay details.");
+      }
+
+      if (payload.message) {
+        setBillingMessage(payload.message);
       }
 
       router.refresh();
@@ -765,6 +1031,11 @@ export function AdminPanel({
                       ? formatCurrency(order.shopEarningPaise / 100)
                       : "-"}
                   </p>
+                  {isZeroPricedOrder(order) ? (
+                    <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+                      This order was created before valid pricing was set. Ask customer to place a new order.
+                    </p>
+                  ) : null}
                   <p className="mt-1">Failure reason: {order.transferFailureReason || "-"}</p>
                   <p className="mt-1">
                     Last transfer update: {formatAuditDate(order.transferUpdatedAt || null)}
@@ -848,6 +1119,11 @@ export function AdminPanel({
                       ? formatCurrency(order.shopEarningPaise / 100)
                       : "-"}
                   </p>
+                  {isZeroPricedOrder(order) ? (
+                    <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+                      This order was created before valid pricing was set. Ask customer to place a new order.
+                    </p>
+                  ) : null}
                   {order.settlementPaidAt ? (
                     <p className="mt-1">
                       Settlement paid at: {formatDate(order.settlementPaidAt)}
@@ -1200,6 +1476,9 @@ export function AdminPanel({
                       Saved linked account: {shop.razorpayLinkedAccountId || "-"}
                     </p>
                     <p className="mt-1">
+                      Admin payment verification: {shop.adminVerifiedRazorpayAccount ? "Confirmed" : "Pending"}
+                    </p>
+                    <p className="mt-1">
                       Route terms accepted: {shop.pendingRouteTermsAccepted ? "Yes" : "No"}
                     </p>
                     <p className="mt-1">
@@ -1213,6 +1492,16 @@ export function AdminPanel({
                     </p>
                   </div>
                 </div>
+                <SensitivePayoutDetailsPanel
+                  shop={shop}
+                  details={sensitiveDetailsByShopId[shop.id]}
+                  error={sensitiveErrorsByShopId[shop.id]}
+                  isLoading={loadingSensitiveShopId === shop.id}
+                  copiedKey={copiedSensitiveKey}
+                  onReveal={handleRevealSensitivePayoutDetails}
+                  onCopyField={copySensitiveValue}
+                  onCopyAll={handleCopyAllSensitivePayoutDetails}
+                />
                 {shop.onboardingStep ? (
                   <p className="mt-1 text-amber-800">
                     Onboarding step: {shop.onboardingStep}
@@ -1260,6 +1549,31 @@ export function AdminPanel({
                       }))
                     }
                   />
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 md:col-span-2">
+                    <p className="font-semibold text-slate-900">
+                      Razorpay API status: {shopRouteForms[shop.id]?.razorpayLinkedAccountStatus || "not_saved"}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      Informational only. Admin confirmation in Razorpay Dashboard is the source of truth for manual onboarding.
+                    </p>
+                    {getLinkedAccountApiStatusWarning(
+                      shopRouteForms[shop.id]?.razorpayLinkedAccountStatus,
+                      shopRouteForms[shop.id]?.adminVerifiedRazorpayAccount,
+                    ) ? (
+                      <p className="mt-2 text-xs leading-5 text-amber-700">
+                        {getLinkedAccountApiStatusWarning(
+                          shopRouteForms[shop.id]?.razorpayLinkedAccountStatus,
+                          shopRouteForms[shop.id]?.adminVerifiedRazorpayAccount,
+                        )}
+                      </p>
+                    ) : null}
+                    {shopRouteForms[shop.id]?.adminVerifiedRazorpayAccount &&
+                    shopRouteForms[shop.id]?.onlinePaymentsEnabled ? (
+                      <p className="mt-2 text-xs leading-5 text-emerald-700">
+                        Linked account verified in Razorpay Dashboard. Online payments enabled.
+                      </p>
+                    ) : null}
+                  </div>
                   <input
                     className="input"
                     placeholder="Bank account holder name"
@@ -1308,7 +1622,29 @@ export function AdminPanel({
                   <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                     <input
                       type="checkbox"
+                      checked={Boolean(shopRouteForms[shop.id]?.adminVerifiedRazorpayAccount)}
+                      onChange={(event) =>
+                        setShopRouteForms((current) => ({
+                          ...current,
+                          [shop.id]: {
+                            ...current[shop.id],
+                            adminVerifiedRazorpayAccount: event.target.checked,
+                            onlinePaymentsEnabled: event.target.checked
+                              ? current[shop.id]?.onlinePaymentsEnabled ?? false
+                              : false,
+                          },
+                        }))
+                      }
+                    />
+                    <span>
+                      I confirmed this linked account is Activated/Verified in Razorpay Dashboard
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
                       checked={Boolean(shopRouteForms[shop.id]?.onlinePaymentsEnabled)}
+                      disabled={!shopRouteForms[shop.id]?.adminVerifiedRazorpayAccount}
                       onChange={(event) =>
                         setShopRouteForms((current) => ({
                           ...current,
@@ -1466,6 +1802,9 @@ export function AdminPanel({
                         Saved linked account: {shop.razorpayLinkedAccountId || "-"}
                       </p>
                       <p className="mt-1">
+                        Admin payment verification: {shop.adminVerifiedRazorpayAccount ? "Confirmed" : "Pending"}
+                      </p>
+                      <p className="mt-1">
                         Onboarding details entered: {shop.pendingRouteTermsAccepted ? "Yes" : "No"}
                       </p>
                       <p className="mt-1">
@@ -1477,8 +1816,18 @@ export function AdminPanel({
                       <p className="mt-1">
                         Payment onboarding note: {shop.paymentOnboardingNote || "-"}
                       </p>
-                    </div>
                   </div>
+                </div>
+                  <SensitivePayoutDetailsPanel
+                    shop={shop}
+                    details={sensitiveDetailsByShopId[shop.id]}
+                    error={sensitiveErrorsByShopId[shop.id]}
+                    isLoading={loadingSensitiveShopId === shop.id}
+                    copiedKey={copiedSensitiveKey}
+                    onReveal={handleRevealSensitivePayoutDetails}
+                    onCopyField={copySensitiveValue}
+                    onCopyAll={handleCopyAllSensitivePayoutDetails}
+                  />
                   {shop.paymentBlockedReason ? (
                     <p className="mt-1 text-xs text-rose-700">
                       Blocked reason: {shop.paymentBlockedReason}
@@ -1516,6 +1865,31 @@ export function AdminPanel({
                         }))
                       }
                     />
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 md:col-span-2">
+                      <p className="font-semibold text-slate-900">
+                        Razorpay API status: {shopRouteForms[shop.id]?.razorpayLinkedAccountStatus || "not_saved"}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        Informational only. Admin confirmation in Razorpay Dashboard is the source of truth for manual onboarding.
+                      </p>
+                      {getLinkedAccountApiStatusWarning(
+                        shopRouteForms[shop.id]?.razorpayLinkedAccountStatus,
+                        shopRouteForms[shop.id]?.adminVerifiedRazorpayAccount,
+                      ) ? (
+                        <p className="mt-2 text-xs leading-5 text-amber-700">
+                          {getLinkedAccountApiStatusWarning(
+                            shopRouteForms[shop.id]?.razorpayLinkedAccountStatus,
+                            shopRouteForms[shop.id]?.adminVerifiedRazorpayAccount,
+                          )}
+                        </p>
+                      ) : null}
+                      {shopRouteForms[shop.id]?.adminVerifiedRazorpayAccount &&
+                      shopRouteForms[shop.id]?.onlinePaymentsEnabled ? (
+                        <p className="mt-2 text-xs leading-5 text-emerald-700">
+                          Linked account verified in Razorpay Dashboard. Online payments enabled.
+                        </p>
+                      ) : null}
+                    </div>
                     <input
                       className="input text-sm"
                       placeholder="Bank account holder name"
@@ -1564,7 +1938,29 @@ export function AdminPanel({
                     <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                       <input
                         type="checkbox"
+                        checked={Boolean(shopRouteForms[shop.id]?.adminVerifiedRazorpayAccount)}
+                        onChange={(event) =>
+                          setShopRouteForms((current) => ({
+                            ...current,
+                            [shop.id]: {
+                              ...current[shop.id],
+                              adminVerifiedRazorpayAccount: event.target.checked,
+                              onlinePaymentsEnabled: event.target.checked
+                                ? current[shop.id]?.onlinePaymentsEnabled ?? false
+                                : false,
+                            },
+                          }))
+                        }
+                      />
+                      <span>
+                        I confirmed this linked account is Activated/Verified in Razorpay Dashboard
+                      </span>
+                    </label>
+                    <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
                         checked={Boolean(shopRouteForms[shop.id]?.onlinePaymentsEnabled)}
+                        disabled={!shopRouteForms[shop.id]?.adminVerifiedRazorpayAccount}
                         onChange={(event) =>
                           setShopRouteForms((current) => ({
                             ...current,

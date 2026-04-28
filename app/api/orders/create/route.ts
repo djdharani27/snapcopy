@@ -12,6 +12,8 @@ import {
   getShopPaymentUnavailableMessage,
 } from "@/lib/payments/shop-readiness";
 import { createRazorpayOrder, getRazorpayKeyId } from "@/lib/payments/razorpay";
+import { calculateTransferBreakdown } from "@/lib/payments/transfer-calculation";
+import { getBillingConfig } from "@/lib/platform/billing";
 
 export async function POST(request: Request) {
   try {
@@ -28,12 +30,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Order not found." }, { status: 404 });
     }
 
+    if (order.paymentStatus === "quote_pending") {
+      return NextResponse.json(
+        { error: "The shop has not set a final payment amount for this order yet." },
+        { status: 400 },
+      );
+    }
+
     if (!order.totalAmountPaise || order.totalAmountPaise <= 0 || !order.printCostPaise) {
       return NextResponse.json({ error: "Trusted order pricing is missing." }, { status: 400 });
     }
 
     if (order.paymentStatus === "paid") {
       return NextResponse.json({ error: "This order is already paid." }, { status: 400 });
+    }
+
+    if (order.paymentStatus !== "ready_to_pay" && order.paymentStatus !== "payment_failed" && order.paymentStatus !== "unpaid") {
+      return NextResponse.json(
+        { error: "This order is not ready for payment yet." },
+        { status: 400 },
+      );
     }
 
     const shop = await getShopById(order.shopId);
@@ -57,6 +73,14 @@ export async function POST(request: Request) {
     }
 
     const amountInPaise = order.totalAmountPaise;
+    const billingConfig = await getBillingConfig();
+    const transferBreakdown = calculateTransferBreakdown({
+      amountPaise: amountInPaise,
+      shopAmountPaise: order.shopEarningPaise ?? 0,
+      estimatedRazorpayFeePercent: billingConfig.estimatedRazorpayFeePercent,
+      estimatedGstPercent: billingConfig.estimatedGstPercent,
+      transactionFeeEnabled: false,
+    });
     const paymentIntent = await beginOrderPaymentIntent({
       orderId: order.id,
       amountPaise: amountInPaise,
@@ -105,7 +129,8 @@ export async function POST(request: Request) {
         transfers: [
           {
             accountId: shop.razorpayLinkedAccountId,
-            amountInPaise: order.shopEarningPaise ?? amountInPaise,
+            amountInPaise:
+              order.transferableAmountPaise ?? transferBreakdown.transferableAmountPaise,
             notes: {
               orderId: order.id,
               shopId: order.shopId,
@@ -123,7 +148,8 @@ export async function POST(request: Request) {
       razorpayOrderId: razorpayOrder.id,
       amountPaise: amountInPaise,
       linkedAccountId: shop.razorpayLinkedAccountId,
-      transferableAmountPaise: order.shopEarningPaise ?? amountInPaise,
+      transferableAmountPaise:
+        order.transferableAmountPaise ?? transferBreakdown.transferableAmountPaise,
     });
 
     return NextResponse.json({

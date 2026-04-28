@@ -14,6 +14,15 @@ export function parsePrice(value: unknown) {
   return numericValue;
 }
 
+export function validateShopPricing(pricing: {
+  blackWhiteSingle: number;
+  blackWhiteDouble: number;
+  colorSingle: number;
+  colorDouble: number;
+}) {
+  return pricing;
+}
+
 export function parseGoogleMapsUrl(value: unknown) {
   const trimmedValue = String(value || "").trim();
   if (!trimmedValue) {

@@ -1,15 +1,12 @@
 import type { Shop } from "@/types";
 
-function getNormalizedLinkedAccountStatus(value: unknown) {
-  return String(value || "").trim().toLowerCase();
-}
-
 export function canShopReceiveOnlinePayments(
   shop?:
     | Pick<
         Shop,
         | "approvalStatus"
         | "onlinePaymentsEnabled"
+        | "adminVerifiedRazorpayAccount"
         | "razorpayLinkedAccountId"
         | "razorpayLinkedAccountStatus"
         | "paymentBlockedReason"
@@ -21,18 +18,14 @@ export function canShopReceiveOnlinePayments(
   }
 
   const linkedAccountId = String(shop?.razorpayLinkedAccountId || "").trim();
-  const linkedAccountStatus = getNormalizedLinkedAccountStatus(shop?.razorpayLinkedAccountStatus);
   const onlinePaymentsEnabled = Boolean(shop?.onlinePaymentsEnabled);
+  const adminVerifiedRazorpayAccount = Boolean(shop?.adminVerifiedRazorpayAccount);
 
-  if (!linkedAccountId || !onlinePaymentsEnabled) {
+  if (!linkedAccountId || !onlinePaymentsEnabled || !adminVerifiedRazorpayAccount) {
     return false;
   }
 
-  if (linkedAccountStatus === "suspended") {
-    return false;
-  }
-
-  return !String(shop?.paymentBlockedReason || "").trim();
+  return true;
 }
 
 export function getShopPaymentBlockedReason(shop?: Shop | null) {
@@ -52,22 +45,12 @@ export function getShopPaymentBlockedReason(shop?: Shop | null) {
     return "Verified Razorpay linked account id has not been saved yet.";
   }
 
-  const accountReason = String(shop.razorpayLinkedAccountStatusReason || "").trim();
-  const accountDescription = String(shop.razorpayLinkedAccountStatusDescription || "").trim();
-
-  if (accountReason || accountDescription) {
-    return [accountReason, accountDescription].filter(Boolean).join(" - ");
-  }
-
-  if (
-    shop.razorpayLinkedAccountStatus &&
-    getNormalizedLinkedAccountStatus(shop.razorpayLinkedAccountStatus) === "suspended"
-  ) {
-    return `Linked account status is ${shop.razorpayLinkedAccountStatus}.`;
-  }
-
   if (!shop.onlinePaymentsEnabled) {
     return "Online payments are still turned off by admin.";
+  }
+
+  if (!shop.adminVerifiedRazorpayAccount) {
+    return "Waiting for admin payment verification.";
   }
 
   if (String(shop.paymentBlockedReason || "").trim()) {

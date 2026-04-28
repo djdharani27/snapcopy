@@ -19,7 +19,6 @@ export function ShopSetupForm({
   const [statusMessage, setStatusMessage] = useState("");
   const approvalStatus = shop?.approvalStatus || null;
   const hasLinkedAccount = Boolean(shop?.razorpayLinkedAccountId);
-  const isApproved = approvalStatus === "approved";
   const isPending = approvalStatus === "pending_approval";
   const isRejected = approvalStatus === "rejected";
 
@@ -91,7 +90,7 @@ export function ShopSetupForm({
             : isRejected
               ? "Resubmit your print shop"
               : shop
-                ? "Manage your print shop"
+                ? "Update your shop request"
                 : "Create your print shop"}
         </h1>
         <p className="mt-3 text-sm leading-7 text-slate-600">
@@ -105,8 +104,8 @@ export function ShopSetupForm({
         </p>
         {isPending ? (
           <div className="mt-4 rounded-[24px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            Your shop request is pending admin approval. You can still update the details below and
-            resubmit them.
+            Your shop request is pending admin approval. You can still update the details below
+            while the admin review is in progress.
           </div>
         ) : null}
         {isRejected ? (
@@ -271,7 +270,9 @@ export function ShopSetupForm({
               </p>
               <p className="mt-2">Status: {shop?.razorpayLinkedAccountStatus || "created"}</p>
               <p className="mt-2">
-                Online payments: {shop?.onlinePaymentsEnabled ? "enabled" : "disabled"}
+                Online payments: {shop?.adminVerifiedRazorpayAccount && shop?.onlinePaymentsEnabled
+                  ? "active"
+                  : "Waiting for admin payment verification"}
               </p>
               <p className="mt-2">Beneficiary: {shop?.bankAccountHolderName || "-"}</p>
               <p className="mt-2">
@@ -379,7 +380,7 @@ export function ShopSetupForm({
                 type="checkbox"
                 name="acceptRouteTerms"
                 className="mt-1 h-4 w-4 accent-[#0f766e]"
-                defaultChecked={Boolean(shop?.pendingRouteTermsAccepted) || isApproved}
+                defaultChecked={Boolean(shop?.pendingRouteTermsAccepted)}
                 required
                 {...hydrationSafeProps}
               />
@@ -486,9 +487,7 @@ export function ShopSetupForm({
         >
           {loading
             ? "Submitting..."
-            : isApproved
-              ? "Save changes"
-              : shop
+            : shop
                 ? "Resubmit for approval"
                 : "Submit for approval"}
         </button>

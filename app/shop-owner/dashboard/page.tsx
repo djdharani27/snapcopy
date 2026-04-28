@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { RefreshButton } from "@/components/layout/refresh-button";
 import { AutoRefresh } from "@/components/shop-owner/auto-refresh";
 import { OrdersTable } from "@/components/shop-owner/orders-table";
+import { ShopPricingForm } from "@/components/shop-owner/shop-pricing-form";
 import { RouteOnboardingStatusCard } from "@/components/shop-owner/route-onboarding-status-card";
 import { ShopQrCard } from "@/components/shop-owner/shop-qr-card";
 import { ShopQrToggle } from "@/components/shop-owner/shop-qr-toggle";
@@ -12,6 +13,7 @@ import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { requireRole } from "@/lib/auth/session";
 import { getOrdersForShop, getShopByOwnerId } from "@/lib/firebase/firestore-admin";
 import { canShopReceiveOnlinePayments, getShopPaymentBlockedReason } from "@/lib/payments/shop-readiness";
+import { formatCurrency } from "@/lib/utils/format";
 
 export default async function ShopOwnerDashboardPage() {
   noStore();
@@ -25,6 +27,8 @@ export default async function ShopOwnerDashboardPage() {
 
   const orders = await getOrdersForShop(shop.id);
   const isPaymentReady = canShopReceiveOnlinePayments(shop);
+  const hasLinkedAccount = Boolean(String(shop.razorpayLinkedAccountId || "").trim());
+  const areOnlinePaymentsEnabled = Boolean(shop.onlinePaymentsEnabled);
 
   return (
     <DashboardShell
@@ -36,7 +40,7 @@ export default async function ShopOwnerDashboardPage() {
       actions={
         <>
           <RefreshButton />
-          <Link href="/shop-owner/setup" className="icon-btn" aria-label="Shop settings" title="Shop settings">
+          <Link href="/shop-owner/settings" className="icon-btn" aria-label="Shop settings" title="Shop settings">
             <svg
               aria-hidden="true"
               viewBox="0 0 24 24"
@@ -59,10 +63,61 @@ export default async function ShopOwnerDashboardPage() {
       {!isPaymentReady ? (
         <div className="panel p-6">
           <p className="text-sm text-slate-500">Manual payout onboarding pending</p>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Online payments are blocked</h2>
-          <p className="mt-3 text-sm leading-6 text-slate-600">{getShopPaymentBlockedReason(shop)}</p>
+          <h2 className="mt-2 text-2xl font-semibold text-slate-900">
+            {areOnlinePaymentsEnabled
+              ? "Waiting for admin payment verification"
+              : "Shop approved, payment setup pending"}
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            {areOnlinePaymentsEnabled
+              ? getShopPaymentBlockedReason(shop)
+              : hasLinkedAccount
+                ? "Your shop is approved. Admin still needs to finish the manual Razorpay payment enablement before customers can pay online."
+                : "Your shop is approved. Admin still needs to create and save the manual Razorpay linked account before customers can pay online."}
+          </p>
         </div>
       ) : null}
+      <div className="panel p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm text-slate-500">Pricing Settings</p>
+            <h2 className="mt-2 text-xl font-semibold text-slate-900">Shop Pricing</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Keep optional reference prices here without reopening approval or changing Razorpay setup. Customer payments are now quoted per order from the orders list below.
+            </p>
+          </div>
+          <Link href="/shop-owner/settings" className="btn-secondary">
+            More shop settings
+          </Link>
+        </div>
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm text-slate-500">B/W single</p>
+            <p className="mt-2 text-lg font-semibold text-slate-900">
+              {formatCurrency(shop.pricing.blackWhiteSingle)}/page
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm text-slate-500">B/W double</p>
+            <p className="mt-2 text-lg font-semibold text-slate-900">
+              {formatCurrency(shop.pricing.blackWhiteDouble)}/page
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm text-slate-500">Color single</p>
+            <p className="mt-2 text-lg font-semibold text-slate-900">
+              {formatCurrency(shop.pricing.colorSingle)}/page
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm text-slate-500">Color double</p>
+            <p className="mt-2 text-lg font-semibold text-slate-900">
+              {formatCurrency(shop.pricing.colorDouble)}/page
+            </p>
+          </div>
+        </div>
+        <ShopPricingForm shop={shop} />
+      </div>
       <ShopQrToggle>
         <ShopQrCard shopId={shop.id} />
       </ShopQrToggle>

@@ -5,11 +5,6 @@ import {
   getShopById,
   upsertUserProfile,
 } from "@/lib/firebase/firestore-admin";
-import { calculatePrintOrderPricing } from "@/lib/payments/order-pricing";
-import {
-  canShopReceiveOnlinePayments,
-  getShopPaymentUnavailableMessage,
-} from "@/lib/payments/shop-readiness";
 import { PRINT_TYPES, SIDE_TYPES } from "@/lib/utils/constants";
 
 export async function POST(request: Request) {
@@ -69,21 +64,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Shop not found." }, { status: 404 });
     }
 
-    if (!canShopReceiveOnlinePayments(shop)) {
-      return NextResponse.json(
-        { error: getShopPaymentUnavailableMessage(shop) },
-        { status: 400 },
-      );
-    }
-
-    const pricing = calculatePrintOrderPricing({
-      shop,
-      printType,
-      sideType,
-      pageCount: numericPageCount,
-      copies: numericCopies,
-    });
-
     await upsertUserProfile({
       uid: decoded.uid,
       name: String(customerName).trim(),
@@ -102,7 +82,6 @@ export async function POST(request: Request) {
       sideType,
       pageCount: numericPageCount,
       copies: numericCopies,
-      pricing,
       files,
     });
 

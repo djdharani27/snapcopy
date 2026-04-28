@@ -42,7 +42,9 @@ export function CustomerOrdersList({
         const shouldShowPaymentAction =
           order.status === "pending" &&
           payableAmount !== null &&
-          (order.paymentStatus === "unpaid" || order.paymentStatus === "payment_failed") &&
+          (order.paymentStatus === "ready_to_pay" ||
+            order.paymentStatus === "payment_failed" ||
+            order.paymentStatus === "unpaid") &&
           canAcceptOnlinePayment;
 
         return (
@@ -55,7 +57,7 @@ export function CustomerOrdersList({
                     {shop?.shopName || "Shop"}
                   </h3>
                   <span className={`badge ${statusClassName(order.status)}`}>
-                    {customerStatusLabel(order.status)}
+                    {customerStatusLabel(order.status, order.paymentStatus)}
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-slate-500">
@@ -104,13 +106,13 @@ export function CustomerOrdersList({
               <div className="w-full rounded-[24px] bg-[rgba(255,247,239,0.95)] p-4 text-left md:min-w-56 md:w-auto md:text-right">
                 {order.printCostPaise !== null && order.printCostPaise !== undefined ? (
                   <>
-                    <p className="text-sm text-slate-500">Print cost</p>
+                    <p className="text-sm text-slate-500">Shop quote</p>
                     <p className="mt-2 text-xl font-semibold text-slate-900">
                       {formatCurrency(order.printCostPaise / 100)}
                     </p>
                   </>
                 ) : (
-                  <p className="text-sm text-slate-500">Awaiting trusted print cost</p>
+                  <p className="text-sm text-slate-500">Awaiting shop quote</p>
                 )}
                 {shouldShowPaymentAction ? (
                   <PayOrderButton
@@ -136,9 +138,16 @@ export function CustomerOrdersList({
                 {!canAcceptOnlinePayment &&
                 order.status === "pending" &&
                 payableAmount !== null &&
-                (order.paymentStatus === "unpaid" || order.paymentStatus === "payment_failed") ? (
+                (order.paymentStatus === "ready_to_pay" ||
+                  order.paymentStatus === "payment_failed" ||
+                  order.paymentStatus === "unpaid") ? (
                   <div className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
                     {getShopPaymentUnavailableMessage(shop)}
+                  </div>
+                ) : null}
+                {order.paymentStatus === "quote_pending" ? (
+                  <div className="mt-4 rounded-xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700">
+                    The shop is reviewing your files and has not set the final payment amount yet.
                   </div>
                 ) : null}
                 {order.paymentStatus === "payment_failed" ? (

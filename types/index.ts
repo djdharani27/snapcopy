@@ -9,6 +9,8 @@ export type OrderStatus =
   | "ready_for_pickup"
   | "completed";
 export type PaymentStatus =
+  | "quote_pending"
+  | "ready_to_pay"
   | "unpaid"
   | "payment_failed"
   | "paid"
@@ -113,6 +115,7 @@ export interface Shop {
   pendingOwnerPan?: string;
   pendingRouteTermsAccepted?: boolean;
   onlinePaymentsEnabled?: boolean;
+  adminVerifiedRazorpayAccount?: boolean;
   paymentOnboardingNote?: string;
   subscriptionStatus?: ShopSubscriptionStatus;
   subscriptionValidUntil?: string | null;
@@ -126,6 +129,24 @@ export interface Shop {
     colorDouble: number;
   };
   createdAt?: string | null;
+}
+
+export type AdminShopSummary = Omit<Shop, "pendingBankAccountNumber" | "pendingOwnerPan"> & {
+  bankAccountLast4Masked?: string;
+  panLast4Masked?: string;
+};
+
+export interface AdminShopSensitivePayoutDetails {
+  ownerName: string;
+  settlementEmail: string;
+  phone: string;
+  businessType: string;
+  fullAddress: string;
+  bankAccountHolderName: string;
+  bankAccountNumber: string;
+  bankIfsc: string;
+  ownerPan: string;
+  routeTermsAccepted: boolean;
 }
 
 export interface Order {
@@ -146,6 +167,8 @@ export interface Order {
   shopEarningPaise?: number | null;
   platformEarningPaise?: number | null;
   paymentStatus: PaymentStatus;
+  quotedAt?: string | null;
+  quotedByOwnerId?: string | null;
   paymentIntentStatus?: PaymentIntentStatus | null;
   paymentAttemptAmountPaise?: number | null;
   razorpayOrderId?: string | null;

@@ -3,7 +3,7 @@ import Link from "next/link";
 export function ShopOwnerNav({
   active,
 }: {
-  active: "orders" | "revenue";
+  active: "orders" | "revenue" | "settings";
 }) {
   return (
     <nav
@@ -23,6 +23,13 @@ export function ShopOwnerNav({
         className={active === "revenue" ? "nav-pill-active" : "nav-pill"}
       >
         Revenue
+      </Link>
+      <Link
+        href="/shop-owner/settings"
+        aria-current={active === "settings" ? "page" : undefined}
+        className={active === "settings" ? "nav-pill-active" : "nav-pill"}
+      >
+        Settings
       </Link>
     </nav>
   );

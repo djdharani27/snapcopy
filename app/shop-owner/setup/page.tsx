@@ -1,4 +1,5 @@
 import { unstable_noStore as noStore } from "next/cache";
+import { redirect } from "next/navigation";
 import { ShopSetupForm } from "@/components/shop-owner/shop-setup-form";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { requireRole } from "@/lib/auth/session";
@@ -9,6 +10,11 @@ export default async function ShopOwnerSetupPage() {
 
   const { decoded, profile } = await requireRole("shop_owner");
   const existingShop = await getShopByOwnerId(decoded.uid);
+  const isApproved = existingShop?.approvalStatus === "approved";
+
+  if (isApproved) {
+    redirect("/shop-owner/dashboard");
+  }
 
   return (
     <DashboardShell
@@ -18,11 +24,9 @@ export default async function ShopOwnerSetupPage() {
           ? "Approval pending"
           : existingShop?.approvalStatus === "rejected"
             ? "Resubmit your shop"
-            : existingShop
-              ? "Shop settings"
-              : "Set up your shop"
+            : "Set up your shop"
       }
-      description="Submit your shop details for admin approval. Customers can see your shop and place orders only after approval is completed."
+      description="Submit your shop details for admin approval. Customers can place orders only after approval and the manual Razorpay setup are completed."
     >
       <ShopSetupForm shop={existingShop} profile={profile} />
     </DashboardShell>

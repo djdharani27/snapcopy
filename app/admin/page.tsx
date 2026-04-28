@@ -9,6 +9,7 @@ import {
   getUsersByRole,
 } from "@/lib/firebase/firestore-admin";
 import { getBillingAuditLogs, getBillingConfig } from "@/lib/platform/billing";
+import type { AdminShopSummary } from "@/types";
 
 function getMaskedBankAccountLast4(shop: {
   pendingBankAccountNumber?: string;
@@ -44,7 +45,7 @@ export default async function AdminPage() {
     getOrdersNeedingSettlementAttention(),
     getOrdersNeedingTransferAttention(),
   ]);
-  const adminShops = shops.map((shop) => {
+  const adminShops: AdminShopSummary[] = shops.map((shop) => {
     const safeShop = { ...shop };
     delete safeShop.pendingBankAccountNumber;
     delete safeShop.pendingOwnerPan;

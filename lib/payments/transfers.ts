@@ -4,6 +4,7 @@ import {
   updateOrderTransferSnapshot,
   updateOrderTransferState,
 } from "@/lib/firebase/firestore-admin";
+import { calculateTransferBreakdown } from "@/lib/payments/transfer-calculation";
 import {
   fetchRazorpayPayment,
   fetchRazorpayPaymentTransfers,
@@ -45,18 +46,25 @@ export async function syncOrderTransferState(orderId: string) {
     throw new Error("Payment has not been captured yet.");
   }
 
+  const transfers = await fetchRazorpayPaymentTransfers(payment.id);
+  const transfer = transfers.items?.find((item) => item.recipient === shop.razorpayLinkedAccountId);
+  const transferBreakdown = calculateTransferBreakdown({
+    amountPaise: order.totalAmountPaise,
+    shopAmountPaise: order.shopEarningPaise ?? 0,
+    transactionFeeEnabled: false,
+    actualFeePaise: payment.fee,
+    actualTaxPaise: payment.tax,
+  });
+
   await updateOrderTransferSnapshot({
     orderId: order.id,
     linkedAccountId: shop.razorpayLinkedAccountId,
-    platformTransactionFeePaise: 0,
-    estimatedFeePaise: payment.fee ?? 0,
-    estimatedTaxPaise: payment.tax ?? 0,
-    gatewayFeeSource: payment.fee === null ? null : "actual",
-    transferableAmountPaise: order.shopEarningPaise ?? order.totalAmountPaise,
+    platformTransactionFeePaise: transferBreakdown.platformTransactionFeePaise,
+    estimatedFeePaise: transferBreakdown.estimatedFeePaise,
+    estimatedTaxPaise: transferBreakdown.estimatedTaxPaise,
+    gatewayFeeSource: transferBreakdown.gatewayFeeSource,
+    transferableAmountPaise: transfer?.amount ?? transferBreakdown.transferableAmountPaise,
   });
-
-  const transfers = await fetchRazorpayPaymentTransfers(payment.id);
-  const transfer = transfers.items?.find((item) => item.recipient === shop.razorpayLinkedAccountId);
 
   if (!transfer) {
     await updateOrderTransferState({

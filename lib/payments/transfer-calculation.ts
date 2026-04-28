@@ -26,6 +26,7 @@ function getNumberFromEnv(name: string, fallback: number) {
 
 export function calculateTransferBreakdown(params: {
   amountPaise: number;
+  shopAmountPaise: number;
   transactionFeePaise?: number;
   estimatedRazorpayFeePercent?: number;
   estimatedGstPercent?: number;
@@ -35,6 +36,9 @@ export function calculateTransferBreakdown(params: {
 }) {
   if (!Number.isInteger(params.amountPaise) || params.amountPaise <= 0) {
     throw new Error("Amount must be a positive integer in paise.");
+  }
+  if (!Number.isInteger(params.shopAmountPaise) || params.shopAmountPaise < 0) {
+    throw new Error("Shop amount must be a non-negative integer in paise.");
   }
 
   const estimatedRazorpayFeePercent =
@@ -69,7 +73,10 @@ export function calculateTransferBreakdown(params: {
     ? Number(params.actualTaxPaise)
     : Math.ceil((estimatedFeePaise * estimatedGstPercent) / 100);
   const gatewayFeeSource = hasActualGatewayFees ? "actual" : "estimated";
-  const transferableAmountPaise = Math.max(0, params.amountPaise - platformTransactionFeePaise);
+  const transferableAmountPaise = Math.max(
+    0,
+    params.shopAmountPaise - platformTransactionFeePaise - estimatedFeePaise - estimatedTaxPaise,
+  );
 
   return {
     platformTransactionFeePaise,

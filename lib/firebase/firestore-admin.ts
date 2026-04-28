@@ -51,18 +51,14 @@ function isShopOnlinePaymentActive(shop?: Partial<Shop> | null) {
   }
 
   const linkedAccountId = String(shop.razorpayLinkedAccountId || "").trim();
-  const linkedAccountStatus = String(shop.razorpayLinkedAccountStatus || "").trim().toLowerCase();
   const onlinePaymentsEnabled = Boolean(shop.onlinePaymentsEnabled);
+  const adminVerifiedRazorpayAccount = Boolean(shop.adminVerifiedRazorpayAccount);
 
-  if (!linkedAccountId || !onlinePaymentsEnabled) {
+  if (!linkedAccountId || !onlinePaymentsEnabled || !adminVerifiedRazorpayAccount) {
     return false;
   }
 
-  if (linkedAccountStatus === "suspended") {
-    return false;
-  }
-
-  return !String(shop.paymentBlockedReason || "").trim();
+  return true;
 }
 
 function mapDoc<T>(id: string, data: FirebaseFirestore.DocumentData) {
@@ -76,6 +72,7 @@ function mapDoc<T>(id: string, data: FirebaseFirestore.DocumentData) {
     approvedAt: timestampToIso(data.approvedAt),
     rejectedAt: timestampToIso(data.rejectedAt),
     subscriptionValidUntil: timestampToIso(data.subscriptionValidUntil),
+    quotedAt: timestampToIso(data.quotedAt),
     paidAt: timestampToIso(data.paidAt),
     settlementPaidAt: timestampToIso(data.settlementPaidAt),
     downloadedAt: timestampToIso(data.downloadedAt),
@@ -135,6 +132,7 @@ function normalizeShop(shop: Shop): Shop {
     pendingOwnerPan: String(shop.pendingOwnerPan || "").trim(),
     pendingRouteTermsAccepted: Boolean(shop.pendingRouteTermsAccepted),
     onlinePaymentsEnabled: Boolean(shop.onlinePaymentsEnabled),
+    adminVerifiedRazorpayAccount: Boolean(shop.adminVerifiedRazorpayAccount),
     paymentOnboardingNote: String(shop.paymentOnboardingNote || "").trim(),
     subscriptionStatus:
       shop.subscriptionStatus === "active" || shop.subscriptionStatus === "expired"
@@ -180,7 +178,18 @@ function normalizeOrder(order: Order): Order {
       order.platformEarningPaise === null || order.platformEarningPaise === undefined
         ? null
         : Number(order.platformEarningPaise),
-    paymentStatus: order.paymentStatus || "unpaid",
+    paymentStatus:
+      order.paymentStatus === "quote_pending" ||
+      order.paymentStatus === "ready_to_pay" ||
+      order.paymentStatus === "payment_failed" ||
+      order.paymentStatus === "paid" ||
+      order.paymentStatus === "refund_pending" ||
+      order.paymentStatus === "refunded" ||
+      order.paymentStatus === "refund_failed"
+        ? order.paymentStatus
+        : "unpaid",
+    quotedAt: order.quotedAt || null,
+    quotedByOwnerId: order.quotedByOwnerId || null,
     paymentIntentStatus: order.paymentIntentStatus || "idle",
     paymentAttemptAmountPaise:
       order.paymentAttemptAmountPaise === null || order.paymentAttemptAmountPaise === undefined
@@ -366,6 +375,7 @@ export async function createShop(params: {
   pendingOwnerPan?: string;
   pendingRouteTermsAccepted?: boolean;
   onlinePaymentsEnabled?: boolean;
+  adminVerifiedRazorpayAccount?: boolean;
   paymentOnboardingNote?: string;
   subscriptionStatus?: Shop["subscriptionStatus"];
   subscriptionValidUntil?: string | null;
@@ -419,6 +429,7 @@ export async function createShop(params: {
     pendingOwnerPan: params.pendingOwnerPan || "",
     pendingRouteTermsAccepted: Boolean(params.pendingRouteTermsAccepted),
     onlinePaymentsEnabled: Boolean(params.onlinePaymentsEnabled),
+    adminVerifiedRazorpayAccount: Boolean(params.adminVerifiedRazorpayAccount),
     paymentOnboardingNote: String(params.paymentOnboardingNote || "").trim(),
     subscriptionStatus: params.subscriptionStatus || "inactive",
     subscriptionValidUntil: params.subscriptionValidUntil || null,
@@ -467,6 +478,7 @@ export async function updateShop(params: {
   pendingOwnerPan?: string;
   pendingRouteTermsAccepted?: boolean;
   onlinePaymentsEnabled?: boolean;
+  adminVerifiedRazorpayAccount?: boolean;
   paymentOnboardingNote?: string;
   subscriptionStatus?: Shop["subscriptionStatus"];
   subscriptionValidUntil?: string | null;
@@ -521,6 +533,8 @@ export async function updateShop(params: {
       pendingRouteTermsAccepted: Boolean(params.pendingRouteTermsAccepted),
       onlinePaymentsEnabled:
         params.onlinePaymentsEnabled ?? existing.onlinePaymentsEnabled ?? false,
+      adminVerifiedRazorpayAccount:
+        params.adminVerifiedRazorpayAccount ?? existing.adminVerifiedRazorpayAccount ?? false,
       paymentOnboardingNote:
         params.paymentOnboardingNote ?? existing.paymentOnboardingNote ?? "",
       subscriptionStatus: params.subscriptionStatus || existing.subscriptionStatus || "inactive",
@@ -552,6 +566,7 @@ export async function updateShopRazorpayStatus(params: {
   paymentBlockedReason?: string;
   isActive?: boolean;
   onlinePaymentsEnabled?: boolean;
+  adminVerifiedRazorpayAccount?: boolean;
   paymentOnboardingNote?: string;
 }) {
   await adminDb().collection("shops").doc(params.shopId).set(
@@ -589,6 +604,9 @@ export async function updateShopRazorpayStatus(params: {
       ...(params.isActive !== undefined ? { isActive: params.isActive } : {}),
       ...(params.onlinePaymentsEnabled !== undefined
         ? { onlinePaymentsEnabled: Boolean(params.onlinePaymentsEnabled) }
+        : {}),
+      ...(params.adminVerifiedRazorpayAccount !== undefined
+        ? { adminVerifiedRazorpayAccount: Boolean(params.adminVerifiedRazorpayAccount) }
         : {}),
       ...(params.paymentOnboardingNote !== undefined
         ? { paymentOnboardingNote: String(params.paymentOnboardingNote || "").trim() }
@@ -628,6 +646,7 @@ export async function updateShopApproval(params: {
   bankIfsc?: string;
   bankAccountLast4?: string;
   onlinePaymentsEnabled?: boolean;
+  adminVerifiedRazorpayAccount?: boolean;
   paymentOnboardingNote?: string;
 }) {
   await adminDb().collection("shops").doc(params.shopId).set(
@@ -715,6 +734,9 @@ export async function updateShopApproval(params: {
       ...(params.onlinePaymentsEnabled !== undefined
         ? { onlinePaymentsEnabled: Boolean(params.onlinePaymentsEnabled) }
         : {}),
+      ...(params.adminVerifiedRazorpayAccount !== undefined
+        ? { adminVerifiedRazorpayAccount: Boolean(params.adminVerifiedRazorpayAccount) }
+        : {}),
       ...(params.paymentOnboardingNote !== undefined
         ? { paymentOnboardingNote: String(params.paymentOnboardingNote || "").trim() }
         : {}),
@@ -763,6 +785,7 @@ export async function updateShopRouteDetails(params: {
   bankIfsc?: string;
   bankAccountLast4?: string;
   onlinePaymentsEnabled?: boolean;
+  adminVerifiedRazorpayAccount?: boolean;
   paymentOnboardingNote?: string;
 }) {
   await adminDb().collection("shops").doc(params.shopId).set(
@@ -860,6 +883,9 @@ export async function updateShopRouteDetails(params: {
       ...(params.onlinePaymentsEnabled !== undefined
         ? { onlinePaymentsEnabled: Boolean(params.onlinePaymentsEnabled) }
         : {}),
+      ...(params.adminVerifiedRazorpayAccount !== undefined
+        ? { adminVerifiedRazorpayAccount: Boolean(params.adminVerifiedRazorpayAccount) }
+        : {}),
       ...(params.paymentOnboardingNote !== undefined
         ? { paymentOnboardingNote: String(params.paymentOnboardingNote || "").trim() }
         : {}),
@@ -868,6 +894,80 @@ export async function updateShopRouteDetails(params: {
       params.razorpayProductStatus !== undefined
         ? { razorpayStatusLastSyncedAt: FieldValue.serverTimestamp() }
         : {}),
+    },
+    { merge: true },
+  );
+
+  return getShopById(params.shopId, { includeUnapproved: true });
+}
+
+export async function updateApprovedShopOwnerSettings(params: {
+  shopId: string;
+  ownerId: string;
+  address: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  phone: string;
+  description: string;
+  services: string[];
+  pricing: Shop["pricing"];
+}) {
+  const existing = await getShopById(params.shopId, { includeUnapproved: true });
+
+  if (!existing || existing.ownerId !== params.ownerId) {
+    throw new Error("Shop not found.");
+  }
+
+  if (existing.approvalStatus !== "approved") {
+    throw new Error("Only approved shops can update pricing from settings.");
+  }
+
+  await adminDb().collection("shops").doc(params.shopId).set(
+    {
+      address: String(params.address || "").trim(),
+      city: String(params.city || "").trim(),
+      state: String(params.state || "").trim(),
+      postalCode: String(params.postalCode || "").trim(),
+      phone: String(params.phone || "").trim(),
+      description: String(params.description || "").trim(),
+      services: params.services,
+      pricing: {
+        blackWhiteSingle: Number(params.pricing.blackWhiteSingle || 0),
+        blackWhiteDouble: Number(params.pricing.blackWhiteDouble || 0),
+        colorSingle: Number(params.pricing.colorSingle || 0),
+        colorDouble: Number(params.pricing.colorDouble || 0),
+      },
+    },
+    { merge: true },
+  );
+
+  return getShopById(params.shopId, { includeUnapproved: true });
+}
+
+export async function updateApprovedShopOwnerPricing(params: {
+  shopId: string;
+  ownerId: string;
+  pricing: Shop["pricing"];
+}) {
+  const existing = await getShopById(params.shopId, { includeUnapproved: true });
+
+  if (!existing || existing.ownerId !== params.ownerId) {
+    throw new Error("Shop not found.");
+  }
+
+  if (existing.approvalStatus !== "approved") {
+    throw new Error("Only approved shops can update pricing from the dashboard.");
+  }
+
+  await adminDb().collection("shops").doc(params.shopId).set(
+    {
+      pricing: {
+        blackWhiteSingle: Number(params.pricing.blackWhiteSingle || 0),
+        blackWhiteDouble: Number(params.pricing.blackWhiteDouble || 0),
+        colorSingle: Number(params.pricing.colorSingle || 0),
+        colorDouble: Number(params.pricing.colorDouble || 0),
+      },
     },
     { merge: true },
   );
@@ -910,6 +1010,7 @@ export async function resetShopRouteOnboarding(params: {
       razorpay_product_id: "",
       is_accepting_orders: false,
       onlinePaymentsEnabled: false,
+      adminVerifiedRazorpayAccount: false,
       paymentOnboardingNote: "",
       razorpayStatusLastSyncedAt: FieldValue.serverTimestamp(),
     },
@@ -929,10 +1030,6 @@ export async function createOrderWithFiles(params: {
   sideType: Order["sideType"];
   pageCount: number;
   copies: number;
-  pricing: Pick<
-    Order,
-    "printCostPaise" | "platformFeePaise" | "totalAmountPaise" | "shopEarningPaise" | "platformEarningPaise"
-  >;
   files: Omit<OrderFile, "id" | "orderId" | "createdAt">[];
 }) {
   const db = adminDb();
@@ -981,12 +1078,14 @@ export async function createOrderWithFiles(params: {
     sideType: params.sideType,
     pageCount: params.pageCount,
     copies: params.copies,
-    printCostPaise: params.pricing.printCostPaise,
-    platformFeePaise: params.pricing.platformFeePaise,
-    totalAmountPaise: params.pricing.totalAmountPaise,
-    shopEarningPaise: params.pricing.shopEarningPaise,
-    platformEarningPaise: params.pricing.platformEarningPaise,
-    paymentStatus: "unpaid",
+    printCostPaise: null,
+    platformFeePaise: null,
+    totalAmountPaise: null,
+    shopEarningPaise: null,
+    platformEarningPaise: null,
+    paymentStatus: "quote_pending",
+    quotedAt: null,
+    quotedByOwnerId: null,
     paymentIntentStatus: "idle",
     paymentAttemptAmountPaise: null,
     razorpayOrderId: null,
@@ -1028,6 +1127,56 @@ export async function createOrderWithFiles(params: {
   await batch.commit();
 
   return getOrderById(orderRef.id);
+}
+
+export async function setOrderQuotedPricing(params: {
+  orderId: string;
+  ownerId: string;
+  pricing: Pick<
+    Order,
+    "printCostPaise" | "platformFeePaise" | "totalAmountPaise" | "shopEarningPaise" | "platformEarningPaise"
+  >;
+  transferBreakdown?: Pick<
+    Order,
+    "platformTransactionFeePaise" | "estimatedFeePaise" | "estimatedTaxPaise" | "gatewayFeeSource" | "transferableAmountPaise"
+  >;
+}) {
+  await adminDb().collection("orders").doc(params.orderId).set(
+    {
+      printCostPaise: params.pricing.printCostPaise,
+      platformFeePaise: params.pricing.platformFeePaise,
+      totalAmountPaise: params.pricing.totalAmountPaise,
+      shopEarningPaise: params.pricing.shopEarningPaise,
+      platformEarningPaise: params.pricing.platformEarningPaise,
+      paymentStatus: "ready_to_pay",
+      quotedAt: FieldValue.serverTimestamp(),
+      quotedByOwnerId: params.ownerId,
+      paymentIntentStatus: "idle",
+      paymentAttemptAmountPaise: null,
+      razorpayOrderId: null,
+      razorpayPaymentId: null,
+      platformCommissionPaise: null,
+      platformTransactionFeePaise: params.transferBreakdown?.platformTransactionFeePaise ?? null,
+      estimatedFeePaise: params.transferBreakdown?.estimatedFeePaise ?? null,
+      estimatedTaxPaise: params.transferBreakdown?.estimatedTaxPaise ?? null,
+      gatewayFeeSource: params.transferBreakdown?.gatewayFeeSource ?? null,
+      transferableAmountPaise: params.transferBreakdown?.transferableAmountPaise ?? null,
+      transferId: null,
+      transferStatus: "not_created",
+      transferFailureReason: null,
+      transferUpdatedAt: null,
+      linkedAccountId: null,
+      settlementStatus: null,
+      settlementPaidAt: null,
+      refundId: null,
+      refundedAmountPaise: null,
+      paidAt: null,
+      status: "pending",
+    },
+    { merge: true },
+  );
+
+  return getOrderById(params.orderId);
 }
 
 export async function getOrderById(orderId: string) {
@@ -1178,7 +1327,12 @@ export async function beginOrderPaymentIntent(params: {
     transaction.set(
       ref,
       {
-        paymentStatus: "unpaid",
+        paymentStatus:
+          paymentStatus === "payment_failed"
+            ? "payment_failed"
+            : paymentStatus === "ready_to_pay"
+              ? "ready_to_pay"
+              : "unpaid",
         paymentIntentStatus: "creating",
         paymentAttemptAmountPaise: params.amountPaise,
         razorpayOrderId: null,
@@ -1221,7 +1375,7 @@ export async function finalizeOrderPaymentIntent(params: {
       razorpayOrderId: params.razorpayOrderId,
       paymentIntentStatus: "ready",
       paymentAttemptAmountPaise: params.amountPaise,
-      paymentStatus: "unpaid",
+      paymentStatus: "ready_to_pay",
       linkedAccountId: params.linkedAccountId,
       transferableAmountPaise: params.transferableAmountPaise,
       transferStatus: "pending",
