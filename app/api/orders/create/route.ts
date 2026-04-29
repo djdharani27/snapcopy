@@ -15,6 +15,24 @@ import { createRazorpayOrder, getRazorpayKeyId } from "@/lib/payments/razorpay";
 import { calculateTransferBreakdown } from "@/lib/payments/transfer-calculation";
 import { getBillingConfig } from "@/lib/platform/billing";
 
+function methodNotAllowed() {
+  return NextResponse.json(
+    {
+      error: "Method not allowed. Use POST to create a Razorpay order for checkout.",
+    },
+    {
+      status: 405,
+      headers: {
+        Allow: "POST",
+      },
+    },
+  );
+}
+
+export async function GET() {
+  return methodNotAllowed();
+}
+
 export async function POST(request: Request) {
   try {
     const { decoded } = await requireApiRole("customer");
