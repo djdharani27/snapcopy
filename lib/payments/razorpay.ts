@@ -16,7 +16,7 @@ function normalizeRazorpayPhone(value: string) {
 
 function assertRazorpayEnv() {
   const required = {
-    keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+    keyId: process.env.RAZORPAY_KEY_ID,
     keySecret: process.env.RAZORPAY_KEY_SECRET,
   };
 
@@ -40,8 +40,18 @@ function assertRazorpayWebhookEnv() {
 }
 
 export function getRazorpayKeyId() {
+  const publicKeyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+
+  if (publicKeyId && !String(publicKeyId).includes("replace-me")) {
+    return publicKeyId;
+  }
+
+  return getServerRazorpayKeyId();
+}
+
+function getServerRazorpayKeyId() {
   assertRazorpayEnv();
-  return process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID as string;
+  return process.env.RAZORPAY_KEY_ID as string;
 }
 
 function getRazorpayKeySecret() {
@@ -74,7 +84,7 @@ function getRazorpayRouteBusinessProfile(params: {
 
 function getRazorpayBasicAuthHeader() {
   return `Basic ${Buffer.from(
-    `${getRazorpayKeyId()}:${getRazorpayKeySecret()}`,
+    `${getServerRazorpayKeyId()}:${getRazorpayKeySecret()}`,
   ).toString("base64")}`;
 }
 
