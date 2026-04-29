@@ -80,19 +80,23 @@ export function getRazorpayKeyId(): string {
     "NEXT_PUBLIC_RAZORPAY_TEST_KEY_ID",
   );
   const serverKeyId = getPreferredEnvValue("RAZORPAY_KEY_ID", "RAZORPAY_TEST_KEY_ID");
+  const normalizedPublicKeyId =
+    typeof publicKeyId === "string" && !isInvalidEnvValue(publicKeyId) ? publicKeyId : null;
+  const normalizedServerKeyId =
+    typeof serverKeyId === "string" && !isInvalidEnvValue(serverKeyId) ? serverKeyId : null;
 
   if (
-    !isInvalidEnvValue(publicKeyId) &&
-    !isInvalidEnvValue(serverKeyId) &&
-    publicKeyId !== serverKeyId
+    normalizedPublicKeyId &&
+    normalizedServerKeyId &&
+    normalizedPublicKeyId !== normalizedServerKeyId
   ) {
     throw new Error(
       "Razorpay public checkout key does not match the server API key. Make NEXT_PUBLIC_RAZORPAY_KEY_ID and RAZORPAY_KEY_ID use the same Razorpay account.",
     );
   }
 
-  if (!isInvalidEnvValue(publicKeyId)) {
-    return publicKeyId as string;
+  if (normalizedPublicKeyId) {
+    return normalizedPublicKeyId;
   }
 
   return getServerRazorpayKeyId();
