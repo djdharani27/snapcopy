@@ -74,7 +74,7 @@ function assertRazorpayWebhookEnv() {
   }
 }
 
-export function getRazorpayKeyId() {
+export function getRazorpayKeyId(): string {
   const publicKeyId = getPreferredEnvValue(
     "NEXT_PUBLIC_RAZORPAY_KEY_ID",
     "NEXT_PUBLIC_RAZORPAY_TEST_KEY_ID",
@@ -98,17 +98,17 @@ export function getRazorpayKeyId() {
   return getServerRazorpayKeyId();
 }
 
-function getServerRazorpayKeyId() {
+function getServerRazorpayKeyId(): string {
   assertRazorpayEnv();
   return getPreferredEnvValue("RAZORPAY_KEY_ID", "RAZORPAY_TEST_KEY_ID") as string;
 }
 
-function getRazorpayKeySecret() {
+function getRazorpayKeySecret(): string {
   assertRazorpayEnv();
   return getPreferredEnvValue("RAZORPAY_KEY_SECRET", "RAZORPAY_TEST_KEY_SECRET") as string;
 }
 
-function getRazorpayWebhookSecret() {
+function getRazorpayWebhookSecret(): string {
   assertRazorpayWebhookEnv();
   return getPreferredEnvValue(
     "RAZORPAY_WEBHOOK_SECRET",

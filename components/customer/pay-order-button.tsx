@@ -29,6 +29,8 @@ export function PayOrderButton({
   const [paymentState, setPaymentState] = useState<"idle" | "starting" | "verifying">("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const checkoutStartTimeoutMs = 10000;
+  const allowLiveRazorpayOnLocalhost =
+    process.env.NEXT_PUBLIC_ALLOW_LIVE_RAZORPAY_ON_LOCALHOST === "true";
 
   const isBusy = paymentState !== "idle";
 
@@ -127,7 +129,8 @@ export function PayOrderButton({
       if (
         typeof window !== "undefined" &&
         ["localhost", "127.0.0.1"].includes(window.location.hostname) &&
-        keyId.startsWith("rzp_live_")
+        keyId.startsWith("rzp_live_") &&
+        !allowLiveRazorpayOnLocalhost
       ) {
         throw new Error(
           "Local checkout is using a live Razorpay key. Use test keys on localhost, then switch to live keys only on your production domain.",
