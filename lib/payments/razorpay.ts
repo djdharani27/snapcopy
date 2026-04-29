@@ -10,6 +10,10 @@ function isInvalidEnvValue(value: string | null | undefined) {
   );
 }
 
+function hasValidEnvValue(value: string | null | undefined): value is string {
+  return !isInvalidEnvValue(value);
+}
+
 function isDevelopmentEnvironment() {
   return process.env.NODE_ENV !== "production";
 }
@@ -18,15 +22,15 @@ function getPreferredEnvValue(primaryKey: string, developmentFallbackKey?: strin
   if (developmentFallbackKey && isDevelopmentEnvironment()) {
     const developmentValue = process.env[developmentFallbackKey];
 
-    if (!isInvalidEnvValue(developmentValue)) {
-      return developmentValue as string;
+    if (hasValidEnvValue(developmentValue)) {
+      return developmentValue;
     }
   }
 
   const primaryValue = process.env[primaryKey];
 
-  if (!isInvalidEnvValue(primaryValue)) {
-    return primaryValue as string;
+  if (hasValidEnvValue(primaryValue)) {
+    return primaryValue;
   }
 
   return null;
@@ -80,23 +84,19 @@ export function getRazorpayKeyId(): string {
     "NEXT_PUBLIC_RAZORPAY_TEST_KEY_ID",
   );
   const serverKeyId = getPreferredEnvValue("RAZORPAY_KEY_ID", "RAZORPAY_TEST_KEY_ID");
-  const normalizedPublicKeyId =
-    typeof publicKeyId === "string" && !isInvalidEnvValue(publicKeyId) ? publicKeyId : null;
-  const normalizedServerKeyId =
-    typeof serverKeyId === "string" && !isInvalidEnvValue(serverKeyId) ? serverKeyId : null;
 
   if (
-    normalizedPublicKeyId &&
-    normalizedServerKeyId &&
-    normalizedPublicKeyId !== normalizedServerKeyId
+    hasValidEnvValue(publicKeyId) &&
+    hasValidEnvValue(serverKeyId) &&
+    publicKeyId !== serverKeyId
   ) {
     throw new Error(
       "Razorpay public checkout key does not match the server API key. Make NEXT_PUBLIC_RAZORPAY_KEY_ID and RAZORPAY_KEY_ID use the same Razorpay account.",
     );
   }
 
-  if (normalizedPublicKeyId) {
-    return normalizedPublicKeyId;
+  if (hasValidEnvValue(publicKeyId)) {
+    return publicKeyId;
   }
 
   return getServerRazorpayKeyId();
