@@ -1,6 +1,6 @@
 import crypto from "crypto";
 
-function isInvalidEnvValue(value: string | undefined) {
+function isInvalidEnvValue(value: string | null | undefined) {
   const normalized = String(value || "").trim().toLowerCase();
   return (
     !normalized ||
