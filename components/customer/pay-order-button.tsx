@@ -53,6 +53,16 @@ export function PayOrderButton({
         throw new Error("Razorpay checkout is not configured correctly. Missing public key.");
       }
 
+      if (
+        typeof window !== "undefined" &&
+        ["localhost", "127.0.0.1"].includes(window.location.hostname) &&
+        String(createOrderPayload.keyId).startsWith("rzp_live_")
+      ) {
+        throw new Error(
+          "Local checkout is using a live Razorpay key. Use test keys on localhost, then switch to live keys only on your production domain.",
+        );
+      }
+
       if (!window.Razorpay) {
         throw new Error("Razorpay checkout failed to load.");
       }
