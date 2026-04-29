@@ -1,5 +1,15 @@
 import crypto from "crypto";
 
+function isInvalidEnvValue(value: string | undefined) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return (
+    !normalized ||
+    normalized === "undefined" ||
+    normalized === "null" ||
+    normalized.includes("replace-me")
+  );
+}
+
 function normalizeRazorpayPhone(value: string) {
   const digits = String(value || "").replace(/\D/g, "");
 
@@ -21,7 +31,7 @@ function assertRazorpayEnv() {
   };
 
   const missing = Object.entries(required)
-    .filter(([, value]) => !value || String(value).includes("replace-me"))
+    .filter(([, value]) => isInvalidEnvValue(value))
     .map(([key]) => key);
 
   if (missing.length > 0) {
@@ -34,7 +44,7 @@ function assertRazorpayEnv() {
 function assertRazorpayWebhookEnv() {
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
 
-  if (!secret || String(secret).includes("replace-me")) {
+  if (isInvalidEnvValue(secret)) {
     throw new Error("Missing Razorpay webhook secret. Add RAZORPAY_WEBHOOK_SECRET to .env.local.");
   }
 }
@@ -42,7 +52,7 @@ function assertRazorpayWebhookEnv() {
 export function getRazorpayKeyId() {
   const publicKeyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
 
-  if (publicKeyId && !String(publicKeyId).includes("replace-me")) {
+  if (!isInvalidEnvValue(publicKeyId)) {
     return publicKeyId;
   }
 

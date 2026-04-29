@@ -49,6 +49,10 @@ export function PayOrderButton({
         throw new Error(createOrderPayload.error || "Unable to start payment.");
       }
 
+      if (!createOrderPayload.keyId || String(createOrderPayload.keyId).trim().toLowerCase() === "undefined") {
+        throw new Error("Razorpay checkout is not configured correctly. Missing public key.");
+      }
+
       if (!window.Razorpay) {
         throw new Error("Razorpay checkout failed to load.");
       }
