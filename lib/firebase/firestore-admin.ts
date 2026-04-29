@@ -1378,7 +1378,7 @@ export async function finalizeOrderPaymentIntent(params: {
       paymentStatus: "ready_to_pay",
       linkedAccountId: params.linkedAccountId,
       transferableAmountPaise: params.transferableAmountPaise,
-      transferStatus: "pending",
+      transferStatus: "not_created",
       settlementStatus: null,
     },
     { merge: true },

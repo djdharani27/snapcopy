@@ -34,6 +34,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  let orderIdForCleanup: string | null = null;
+
   try {
     const { decoded } = await requireApiRole("customer");
     const { orderId } = await request.json();
@@ -103,12 +105,15 @@ export async function POST(request: Request) {
       orderId: order.id,
       amountPaise: amountInPaise,
     });
+    orderIdForCleanup = order.id;
 
     if (paymentIntent.action === "paid") {
+      orderIdForCleanup = null;
       return NextResponse.json({ error: "This order is already paid." }, { status: 400 });
     }
 
     if (paymentIntent.action === "creating") {
+      orderIdForCleanup = null;
       return NextResponse.json(
         { error: "Payment is being prepared. Try again in a moment." },
         { status: 409 },
@@ -116,6 +121,7 @@ export async function POST(request: Request) {
     }
 
     if (paymentIntent.action === "reuse" && paymentIntent.razorpayOrderId) {
+      orderIdForCleanup = null;
       return NextResponse.json({
         razorpayOrderId: paymentIntent.razorpayOrderId,
         amount: paymentIntent.amountPaise,
@@ -131,35 +137,28 @@ export async function POST(request: Request) {
     }
 
     const receipt = `sc-ord-${order.id.slice(-24)}`;
-    let razorpayOrder;
-
-    try {
-      razorpayOrder = await createRazorpayOrder({
-        amountInPaise,
-        receipt,
-        notes: {
-          orderId: order.id,
-          shopId: order.shopId,
-          customerId: order.customerId,
-          pageCount: String(order.pageCount || 0),
-          copies: String(order.copies),
-        },
-        transfers: [
-          {
-            accountId: shop.razorpayLinkedAccountId,
-            amountInPaise:
-              order.transferableAmountPaise ?? transferBreakdown.transferableAmountPaise,
-            notes: {
-              orderId: order.id,
-              shopId: order.shopId,
-            },
+    const razorpayOrder = await createRazorpayOrder({
+      amountInPaise,
+      receipt,
+      notes: {
+        orderId: order.id,
+        shopId: order.shopId,
+        customerId: order.customerId,
+        pageCount: String(order.pageCount || 0),
+        copies: String(order.copies),
+      },
+      transfers: [
+        {
+          accountId: shop.razorpayLinkedAccountId,
+          amountInPaise:
+            order.transferableAmountPaise ?? transferBreakdown.transferableAmountPaise,
+          notes: {
+            orderId: order.id,
+            shopId: order.shopId,
           },
-        ],
-      });
-    } catch (error) {
-      await failOrderPaymentIntent(order.id);
-      throw error;
-    }
+        },
+      ],
+    });
 
     await finalizeOrderPaymentIntent({
       orderId: order.id,
@@ -169,6 +168,7 @@ export async function POST(request: Request) {
       transferableAmountPaise:
         order.transferableAmountPaise ?? transferBreakdown.transferableAmountPaise,
     });
+    orderIdForCleanup = null;
 
     return NextResponse.json({
       razorpayOrderId: razorpayOrder.id,
@@ -183,6 +183,17 @@ export async function POST(request: Request) {
       order,
     });
   } catch (error) {
+    if (orderIdForCleanup) {
+      try {
+        await failOrderPaymentIntent(orderIdForCleanup);
+      } catch (cleanupError) {
+        console.error("Failed to reset order payment intent after create failure", {
+          orderId: orderIdForCleanup,
+          error: cleanupError instanceof Error ? cleanupError.message : cleanupError,
+        });
+      }
+    }
+
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to create payment order." },
       { status: 400 },

@@ -27,14 +27,42 @@ export function PayOrderButton({
 }) {
   const router = useRouter();
   const [paymentState, setPaymentState] = useState<"idle" | "starting" | "verifying">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
 
   const isBusy = paymentState !== "idle";
+
+  async function getResponsePayload(response: Response) {
+    const contentType = response.headers.get("content-type") || "";
+
+    if (contentType.toLowerCase().includes("application/json")) {
+      try {
+        return (await response.json()) as Record<string, unknown>;
+      } catch {
+        return null;
+      }
+    }
+
+    try {
+      const text = await response.text();
+      return text ? { error: text } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function getErrorMessage(payload: Record<string, unknown> | null, fallback: string) {
+    const message = payload?.error ?? payload?.message;
+    return typeof message === "string" && message.trim() ? message : fallback;
+  }
 
   async function handlePay() {
     if (isBusy) {
       return;
     }
 
+    let checkoutOpened = false;
+
+    setErrorMessage("");
     setPaymentState("starting");
 
     try {
@@ -44,12 +72,16 @@ export function PayOrderButton({
         body: JSON.stringify({ orderId }),
       });
 
-      const createOrderPayload = await createOrderResponse.json();
+      const createOrderPayload = await getResponsePayload(createOrderResponse);
       if (!createOrderResponse.ok) {
-        throw new Error(createOrderPayload.error || "Unable to start payment.");
+        throw new Error(getErrorMessage(createOrderPayload, "Unable to start payment."));
       }
 
-      if (!createOrderPayload.keyId || String(createOrderPayload.keyId).trim().toLowerCase() === "undefined") {
+      if (
+        !createOrderPayload ||
+        !createOrderPayload.keyId ||
+        String(createOrderPayload.keyId).trim().toLowerCase() === "undefined"
+      ) {
         throw new Error("Razorpay checkout is not configured correctly. Missing public key.");
       }
 
@@ -80,6 +112,7 @@ export function PayOrderButton({
           contact: phone || "",
         },
         handler: async (response: Record<string, string>) => {
+          setErrorMessage("");
           setPaymentState("verifying");
 
           try {
@@ -94,28 +127,35 @@ export function PayOrderButton({
               }),
             });
 
-            const verifyPayload = await verifyResponse.json();
+            const verifyPayload = await getResponsePayload(verifyResponse);
             if (!verifyResponse.ok) {
-              throw new Error(verifyPayload.error || "Payment verification failed.");
+              throw new Error(getErrorMessage(verifyPayload, "Payment verification failed."));
             }
 
-            if (verifyPayload.transferError) {
+            const transferError =
+              typeof verifyPayload?.transferError === "string"
+                ? verifyPayload.transferError
+                : "";
+
+            if (transferError) {
               window.alert(
-                `Payment received. The platform team will retry the shop payout separately. ${verifyPayload.transferError}`,
+                `Payment received. The platform team will retry the shop payout separately. ${transferError}`,
               );
             }
 
             router.refresh();
           } catch (error) {
-            window.alert(
-              error instanceof Error ? error.message : "Payment verification failed.",
-            );
+            const message =
+              error instanceof Error ? error.message : "Payment verification failed.";
+            setErrorMessage(message);
+            window.alert(message);
           } finally {
             setPaymentState("idle");
           }
         },
         modal: {
           ondismiss: () => {
+            setErrorMessage("");
             setPaymentState("idle");
           },
         },
@@ -125,9 +165,16 @@ export function PayOrderButton({
       });
 
       razorpay.open();
+      checkoutOpened = true;
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Unable to process payment.");
-      setPaymentState("idle");
+      const message =
+        error instanceof Error ? error.message : "Unable to process payment.";
+      setErrorMessage(message);
+      window.alert(message);
+    } finally {
+      if (!checkoutOpened) {
+        setPaymentState("idle");
+      }
     }
   }
 
@@ -141,6 +188,11 @@ export function PayOrderButton({
             ? "Verifying payment..."
             : `Pay now Rs. ${amount}`}
       </button>
+      {errorMessage ? (
+        <p className="mt-3 text-sm font-medium text-rose-700" role="alert" aria-live="polite">
+          {errorMessage}
+        </p>
+      ) : null}
     </>
   );
 }
