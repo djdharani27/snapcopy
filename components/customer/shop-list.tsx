@@ -13,6 +13,7 @@ export function ShopList({
   showPricing?: boolean;
 }) {
   const [query, setQuery] = useState("");
+  const hydrationSafeProps = { suppressHydrationWarning: true as const };
 
   const filteredShops = useMemo(() => {
     const value = query.trim().toLowerCase();
@@ -47,6 +48,7 @@ export function ShopList({
           placeholder="Try: Anna Nagar, color print, thesis binding"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
+          {...hydrationSafeProps}
         />
       </div>
 

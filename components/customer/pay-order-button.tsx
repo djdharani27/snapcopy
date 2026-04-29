@@ -28,6 +28,7 @@ export function PayOrderButton({
   const router = useRouter();
   const [paymentState, setPaymentState] = useState<"idle" | "starting" | "verifying">("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const checkoutStartTimeoutMs = 10000;
 
   const isBusy = paymentState !== "idle";
 
@@ -55,12 +56,37 @@ export function PayOrderButton({
     return typeof message === "string" && message.trim() ? message : fallback;
   }
 
+  function getRequiredCheckoutString(
+    payload: Record<string, unknown>,
+    key: "keyId" | "razorpayOrderId" | "currency",
+    errorMessage: string,
+  ) {
+    const value = String(payload[key] || "").trim();
+
+    if (!value || value.toLowerCase() === "undefined" || value.toLowerCase() === "null") {
+      throw new Error(errorMessage);
+    }
+
+    return value;
+  }
+
+  function getRequiredCheckoutAmount(payload: Record<string, unknown>) {
+    const value = Number(payload.amount);
+
+    if (!Number.isFinite(value) || value <= 0) {
+      throw new Error("Razorpay checkout is not configured correctly. Missing payment amount.");
+    }
+
+    return value;
+  }
+
   async function handlePay() {
     if (isBusy) {
       return;
     }
 
     let checkoutOpened = false;
+    let openTimeout: ReturnType<typeof setTimeout> | null = null;
 
     setErrorMessage("");
     setPaymentState("starting");
@@ -77,18 +103,31 @@ export function PayOrderButton({
         throw new Error(getErrorMessage(createOrderPayload, "Unable to start payment."));
       }
 
-      if (
-        !createOrderPayload ||
-        !createOrderPayload.keyId ||
-        String(createOrderPayload.keyId).trim().toLowerCase() === "undefined"
-      ) {
-        throw new Error("Razorpay checkout is not configured correctly. Missing public key.");
+      if (!createOrderPayload) {
+        throw new Error("Razorpay checkout is not configured correctly. Missing checkout payload.");
       }
+
+      const keyId = getRequiredCheckoutString(
+        createOrderPayload,
+        "keyId",
+        "Razorpay checkout is not configured correctly. Missing public key.",
+      );
+      const razorpayOrderId = getRequiredCheckoutString(
+        createOrderPayload,
+        "razorpayOrderId",
+        "Razorpay checkout is not configured correctly. Missing Razorpay order id.",
+      );
+      const currency = getRequiredCheckoutString(
+        createOrderPayload,
+        "currency",
+        "Razorpay checkout is not configured correctly. Missing currency.",
+      );
+      const razorpayAmount = getRequiredCheckoutAmount(createOrderPayload);
 
       if (
         typeof window !== "undefined" &&
         ["localhost", "127.0.0.1"].includes(window.location.hostname) &&
-        String(createOrderPayload.keyId).startsWith("rzp_live_")
+        keyId.startsWith("rzp_live_")
       ) {
         throw new Error(
           "Local checkout is using a live Razorpay key. Use test keys on localhost, then switch to live keys only on your production domain.",
@@ -100,18 +139,23 @@ export function PayOrderButton({
       }
 
       const razorpay = new window.Razorpay({
-        key: createOrderPayload.keyId,
-        amount: createOrderPayload.amount,
-        currency: createOrderPayload.currency,
+        key: keyId,
+        amount: razorpayAmount,
+        currency,
         name: "SnapCopy",
         description: "Print order payment",
-        order_id: createOrderPayload.razorpayOrderId,
+        order_id: razorpayOrderId,
         prefill: {
           name: customerName,
           email,
           contact: phone || "",
         },
         handler: async (response: Record<string, string>) => {
+          if (openTimeout) {
+            clearTimeout(openTimeout);
+            openTimeout = null;
+          }
+
           setErrorMessage("");
           setPaymentState("verifying");
 
@@ -155,6 +199,11 @@ export function PayOrderButton({
         },
         modal: {
           ondismiss: () => {
+            if (openTimeout) {
+              clearTimeout(openTimeout);
+              openTimeout = null;
+            }
+
             setErrorMessage("");
             setPaymentState("idle");
           },
@@ -164,6 +213,17 @@ export function PayOrderButton({
         },
       });
 
+      openTimeout = setTimeout(() => {
+        if (!checkoutOpened) {
+          return;
+        }
+
+        setErrorMessage(
+          "Payment checkout did not open correctly. Please try again.",
+        );
+        setPaymentState("idle");
+      }, checkoutStartTimeoutMs);
+
       razorpay.open();
       checkoutOpened = true;
     } catch (error) {
@@ -172,6 +232,10 @@ export function PayOrderButton({
       setErrorMessage(message);
       window.alert(message);
     } finally {
+      if (!checkoutOpened && openTimeout) {
+        clearTimeout(openTimeout);
+      }
+
       if (!checkoutOpened) {
         setPaymentState("idle");
       }

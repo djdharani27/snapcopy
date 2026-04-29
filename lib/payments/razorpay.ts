@@ -79,6 +79,17 @@ export function getRazorpayKeyId() {
     "NEXT_PUBLIC_RAZORPAY_KEY_ID",
     "NEXT_PUBLIC_RAZORPAY_TEST_KEY_ID",
   );
+  const serverKeyId = getPreferredEnvValue("RAZORPAY_KEY_ID", "RAZORPAY_TEST_KEY_ID");
+
+  if (
+    !isInvalidEnvValue(publicKeyId) &&
+    !isInvalidEnvValue(serverKeyId) &&
+    publicKeyId !== serverKeyId
+  ) {
+    throw new Error(
+      "Razorpay public checkout key does not match the server API key. Make NEXT_PUBLIC_RAZORPAY_KEY_ID and RAZORPAY_KEY_ID use the same Razorpay account.",
+    );
+  }
 
   if (!isInvalidEnvValue(publicKeyId)) {
     return publicKeyId;
@@ -202,6 +213,21 @@ async function parseRazorpayResponse<T>(response: Response, fallbackMessage: str
   const payload = await response.json();
 
   if (!response.ok) {
+    const errorCode = String(payload?.error?.code || "").trim();
+    const errorDescription = String(payload?.error?.description || "").trim();
+    const errorStep = String(payload?.error?.step || "").trim();
+
+    if (
+      fallbackMessage === "Unable to create Razorpay order." &&
+      errorCode === "BAD_REQUEST_ERROR" &&
+      errorDescription === "The id provided does not exist" &&
+      errorStep === "payment_initiation"
+    ) {
+      throw new Error(
+        "This shop's Razorpay linked account is invalid or belongs to a different platform account. Reconnect shop payments and try again.",
+      );
+    }
+
     throw new Error(payload.error?.description || fallbackMessage);
   }
 

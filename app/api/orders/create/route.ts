@@ -40,6 +40,10 @@ export async function POST(request: Request) {
   let orderIdForCleanup: string | null = null;
 
   try {
+    const keyId = getRazorpayKeyId();
+    const shouldForceFreshOrder =
+      process.env.NODE_ENV !== "production" || keyId.startsWith("rzp_test_");
+    const shouldAttachOrderTransfers = !keyId.startsWith("rzp_test_");
     const { decoded } = await requireApiRole("customer");
     const { orderId } = await request.json();
 
@@ -107,6 +111,7 @@ export async function POST(request: Request) {
     const paymentIntent = await beginOrderPaymentIntent({
       orderId: order.id,
       amountPaise: amountInPaise,
+      forceFreshOrder: shouldForceFreshOrder,
     });
     orderIdForCleanup = order.id;
 
@@ -129,7 +134,7 @@ export async function POST(request: Request) {
         razorpayOrderId: paymentIntent.razorpayOrderId,
         amount: paymentIntent.amountPaise,
         currency: "INR",
-        keyId: getRazorpayKeyId(),
+        keyId,
         pricing: {
           printCostPaise: order.printCostPaise,
           platformFeePaise: order.platformFeePaise,
@@ -150,17 +155,19 @@ export async function POST(request: Request) {
         pageCount: String(order.pageCount || 0),
         copies: String(order.copies),
       },
-      transfers: [
-        {
-          accountId: shop.razorpayLinkedAccountId,
-          amountInPaise:
-            order.transferableAmountPaise ?? transferBreakdown.transferableAmountPaise,
-          notes: {
-            orderId: order.id,
-            shopId: order.shopId,
-          },
-        },
-      ],
+      transfers: shouldAttachOrderTransfers
+        ? [
+            {
+              accountId: shop.razorpayLinkedAccountId,
+              amountInPaise:
+                order.transferableAmountPaise ?? transferBreakdown.transferableAmountPaise,
+              notes: {
+                orderId: order.id,
+                shopId: order.shopId,
+              },
+            },
+          ]
+        : undefined,
     });
 
     await finalizeOrderPaymentIntent({
@@ -177,7 +184,7 @@ export async function POST(request: Request) {
       razorpayOrderId: razorpayOrder.id,
       amount: razorpayOrder.amount,
       currency: razorpayOrder.currency,
-      keyId: getRazorpayKeyId(),
+      keyId,
       pricing: {
         printCostPaise: order.printCostPaise,
         platformFeePaise: order.platformFeePaise,

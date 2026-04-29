@@ -21,6 +21,7 @@ export function UploadOrderForm({
   initialShopId?: string;
 }) {
   const router = useRouter();
+  const hydrationSafeProps = { suppressHydrationWarning: true as const };
   const [loading, setLoading] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [createdTrackingCode, setCreatedTrackingCode] = useState("");
@@ -170,6 +171,7 @@ export function UploadOrderForm({
             accept={ACCEPTED_FILE_EXTENSIONS}
             className="input py-3"
             required
+            {...hydrationSafeProps}
           />
 
           <div className="mt-4">
@@ -183,6 +185,7 @@ export function UploadOrderForm({
               value={selectedShopId}
               onChange={(event) => setSelectedShopId(event.target.value)}
               required
+              {...hydrationSafeProps}
             >
               <option value="" disabled>
                 Choose a shop
@@ -216,6 +219,7 @@ export function UploadOrderForm({
                 className="input"
                 defaultValue={profile.name}
                 required
+                {...hydrationSafeProps}
               />
             </div>
 
@@ -232,6 +236,7 @@ export function UploadOrderForm({
                   className="input"
                   placeholder="Saved after your first order"
                   required
+                  {...hydrationSafeProps}
                 />
               </div>
             )}
@@ -257,6 +262,7 @@ export function UploadOrderForm({
                 className="input"
                 value={printType}
                 onChange={(event) => setPrintType(event.target.value as "color" | "black_white")}
+                {...hydrationSafeProps}
               >
                 <option value="black_white">Black &amp; white</option>
                 <option value="color">Color</option>
@@ -275,6 +281,7 @@ export function UploadOrderForm({
                 onChange={(event) =>
                   setSideType(event.target.value as "single_side" | "double_side")
                 }
+                {...hydrationSafeProps}
               >
                 <option value="single_side">Single side</option>
                 <option value="double_side">Double side</option>
@@ -294,6 +301,7 @@ export function UploadOrderForm({
                 onChange={(event) => setPageCount(Number(event.target.value) || 1)}
                 className="input"
                 required
+                {...hydrationSafeProps}
               />
             </div>
 
@@ -310,6 +318,7 @@ export function UploadOrderForm({
                 onChange={(event) => setCopies(Number(event.target.value) || 1)}
                 className="input"
                 required
+                {...hydrationSafeProps}
               />
             </div>
 
@@ -323,6 +332,7 @@ export function UploadOrderForm({
                 rows={4}
                 className="input min-h-28"
                 placeholder="Optional instructions for the shop"
+                {...hydrationSafeProps}
               />
             </div>
           </div>
@@ -338,6 +348,7 @@ export function UploadOrderForm({
           type="submit"
           disabled={loading || showSuccessDialog}
           className="btn-primary w-full sm:w-auto"
+          {...hydrationSafeProps}
         >
           {loading ? "Submitting..." : "Send print order"}
         </button>
@@ -360,7 +371,12 @@ export function UploadOrderForm({
               </p>
             ) : null}
           <div className="mt-6 flex justify-end">
-              <button type="button" onClick={handleSuccessConfirm} className="btn-primary w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={handleSuccessConfirm}
+                className="btn-primary w-full sm:w-auto"
+                {...hydrationSafeProps}
+              >
                 OK
               </button>
             </div>

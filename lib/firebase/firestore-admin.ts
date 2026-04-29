@@ -1277,6 +1277,7 @@ export async function updateOrderStatus(
 export async function beginOrderPaymentIntent(params: {
   orderId: string;
   amountPaise: number;
+  forceFreshOrder?: boolean;
 }) {
   const ref = adminDb().collection("orders").doc(params.orderId);
 
@@ -1305,6 +1306,7 @@ export async function beginOrderPaymentIntent(params: {
     }
 
     if (
+      !params.forceFreshOrder &&
       existingOrderId &&
       paymentIntentStatus !== "creating" &&
       (existingAmount === null || existingAmount === params.amountPaise)

@@ -34,6 +34,7 @@ export function ShopQrScanButton({
   variant?: "inline" | "hero" | "icon";
 }) {
   const router = useRouter();
+  const hydrationSafeProps = { suppressHydrationWarning: true as const };
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scannerRef = useRef<QrScanner | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -115,6 +116,7 @@ export function ShopQrScanButton({
           type="button"
           onClick={() => setIsOpen(true)}
           className="panel-dark group w-full overflow-hidden p-4 text-left sm:p-6"
+          {...hydrationSafeProps}
         >
           <div className="grid gap-6 md:grid-cols-[1.1fr_0.9fr] md:items-center">
             <div>
@@ -160,6 +162,7 @@ export function ShopQrScanButton({
           className="nav-icon-btn"
           aria-label="Scan shop QR"
           title="Scan shop QR"
+          {...hydrationSafeProps}
         >
           <svg
             aria-hidden="true"
@@ -182,7 +185,12 @@ export function ShopQrScanButton({
           </svg>
         </button>
       ) : (
-        <button type="button" onClick={() => setIsOpen(true)} className="btn-secondary">
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          className="btn-secondary"
+          {...hydrationSafeProps}
+        >
           Scan shop QR
         </button>
       )}
@@ -201,6 +209,7 @@ export function ShopQrScanButton({
                 type="button"
                 onClick={() => setIsOpen(false)}
                 className="btn-ghost -mr-2 -mt-1"
+                {...hydrationSafeProps}
               >
                 Close
               </button>
