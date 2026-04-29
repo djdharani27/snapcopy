@@ -92,7 +92,7 @@ export function getRazorpayKeyId(): string {
   }
 
   if (!isInvalidEnvValue(publicKeyId)) {
-    return publicKeyId;
+    return publicKeyId as string;
   }
 
   return getServerRazorpayKeyId();
