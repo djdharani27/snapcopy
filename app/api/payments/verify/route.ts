@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import { ApiAuthError } from "@/lib/auth/errors";
 import { requireApiRole } from "@/lib/auth/session";
 import {
   getOrderById,
   markOrderPaymentVerifiedClientReturn,
 } from "@/lib/firebase/firestore-admin";
 import { fetchRazorpayPayment, verifyRazorpaySignature } from "@/lib/payments/razorpay";
+
+export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
@@ -88,7 +91,7 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to verify payment." },
-      { status: 400 },
+      { status: error instanceof ApiAuthError ? error.status : 400 },
     );
   }
 }

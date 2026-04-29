@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ApiAuthError } from "@/lib/auth/errors";
 import { requireApiRole } from "@/lib/auth/session";
 import {
   beginOrderPaymentIntent,
@@ -14,6 +15,8 @@ import {
 import { createRazorpayOrder, getRazorpayKeyId } from "@/lib/payments/razorpay";
 import { calculateTransferBreakdown } from "@/lib/payments/transfer-calculation";
 import { getBillingConfig } from "@/lib/platform/billing";
+
+export const runtime = "nodejs";
 
 function methodNotAllowed() {
   return NextResponse.json(
@@ -196,7 +199,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to create payment order." },
-      { status: 400 },
+      { status: error instanceof ApiAuthError ? error.status : 400 },
     );
   }
 }

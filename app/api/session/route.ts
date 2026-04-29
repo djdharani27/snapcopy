@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import { getAdminAuth } from "@/lib/firebase/admin";
 
+export const runtime = "nodejs";
+
 export async function POST(request: Request) {
   const { token } = await request.json();
 

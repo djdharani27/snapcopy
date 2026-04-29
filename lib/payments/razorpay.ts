@@ -10,6 +10,28 @@ function isInvalidEnvValue(value: string | undefined) {
   );
 }
 
+function isDevelopmentEnvironment() {
+  return process.env.NODE_ENV !== "production";
+}
+
+function getPreferredEnvValue(primaryKey: string, developmentFallbackKey?: string) {
+  if (developmentFallbackKey && isDevelopmentEnvironment()) {
+    const developmentValue = process.env[developmentFallbackKey];
+
+    if (!isInvalidEnvValue(developmentValue)) {
+      return developmentValue as string;
+    }
+  }
+
+  const primaryValue = process.env[primaryKey];
+
+  if (!isInvalidEnvValue(primaryValue)) {
+    return primaryValue as string;
+  }
+
+  return null;
+}
+
 function normalizeRazorpayPhone(value: string) {
   const digits = String(value || "").replace(/\D/g, "");
 
@@ -26,8 +48,8 @@ function normalizeRazorpayPhone(value: string) {
 
 function assertRazorpayEnv() {
   const required = {
-    keyId: process.env.RAZORPAY_KEY_ID,
-    keySecret: process.env.RAZORPAY_KEY_SECRET,
+    keyId: getPreferredEnvValue("RAZORPAY_KEY_ID", "RAZORPAY_TEST_KEY_ID"),
+    keySecret: getPreferredEnvValue("RAZORPAY_KEY_SECRET", "RAZORPAY_TEST_KEY_SECRET"),
   };
 
   const missing = Object.entries(required)
@@ -42,7 +64,10 @@ function assertRazorpayEnv() {
 }
 
 function assertRazorpayWebhookEnv() {
-  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  const secret = getPreferredEnvValue(
+    "RAZORPAY_WEBHOOK_SECRET",
+    "RAZORPAY_TEST_WEBHOOK_SECRET",
+  );
 
   if (isInvalidEnvValue(secret)) {
     throw new Error("Missing Razorpay webhook secret. Add RAZORPAY_WEBHOOK_SECRET to .env.local.");
@@ -50,7 +75,10 @@ function assertRazorpayWebhookEnv() {
 }
 
 export function getRazorpayKeyId() {
-  const publicKeyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+  const publicKeyId = getPreferredEnvValue(
+    "NEXT_PUBLIC_RAZORPAY_KEY_ID",
+    "NEXT_PUBLIC_RAZORPAY_TEST_KEY_ID",
+  );
 
   if (!isInvalidEnvValue(publicKeyId)) {
     return publicKeyId;
@@ -61,17 +89,20 @@ export function getRazorpayKeyId() {
 
 function getServerRazorpayKeyId() {
   assertRazorpayEnv();
-  return process.env.RAZORPAY_KEY_ID as string;
+  return getPreferredEnvValue("RAZORPAY_KEY_ID", "RAZORPAY_TEST_KEY_ID") as string;
 }
 
 function getRazorpayKeySecret() {
   assertRazorpayEnv();
-  return process.env.RAZORPAY_KEY_SECRET as string;
+  return getPreferredEnvValue("RAZORPAY_KEY_SECRET", "RAZORPAY_TEST_KEY_SECRET") as string;
 }
 
 function getRazorpayWebhookSecret() {
   assertRazorpayWebhookEnv();
-  return process.env.RAZORPAY_WEBHOOK_SECRET as string;
+  return getPreferredEnvValue(
+    "RAZORPAY_WEBHOOK_SECRET",
+    "RAZORPAY_TEST_WEBHOOK_SECRET",
+  ) as string;
 }
 
 function getRazorpayRouteBusinessProfile(params: {
