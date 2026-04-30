@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ACCEPTED_FILE_EXTENSIONS,
   ACCEPTED_FILE_TYPES,
+  MAX_COPIES_PER_ORDER,
   MAX_FILE_SIZE_BYTES,
   MAX_FILES_PER_ORDER,
 } from "@/lib/utils/constants";
@@ -69,6 +70,15 @@ export function UploadOrderForm({
         throw new Error(`You can upload up to ${MAX_FILES_PER_ORDER} files.`);
       }
 
+      const requestedCopies = Number(formData.get("copies"));
+      if (!Number.isInteger(requestedCopies) || requestedCopies < 1) {
+        throw new Error("Copies must be at least 1.");
+      }
+
+      if (requestedCopies > MAX_COPIES_PER_ORDER) {
+        throw new Error(`You can order up to ${MAX_COPIES_PER_ORDER} copies.`);
+      }
+
       files.forEach((file) => {
         if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
           throw new Error(
@@ -105,7 +115,7 @@ export function UploadOrderForm({
           printType: formData.get("printType"),
           sideType: formData.get("sideType"),
           pageCount: Number(formData.get("pageCount")),
-          copies: Number(formData.get("copies")),
+          copies: requestedCopies,
           files: uploadResult.files,
         }),
       });
@@ -314,12 +324,14 @@ export function UploadOrderForm({
                 name="copies"
                 type="number"
                 min="1"
+                max={MAX_COPIES_PER_ORDER}
                 value={copies}
                 onChange={(event) => setCopies(Number(event.target.value) || 1)}
                 className="input"
                 required
                 {...hydrationSafeProps}
               />
+              <p className="mt-2 text-xs text-[#776b61]">Maximum {MAX_COPIES_PER_ORDER} copies.</p>
             </div>
 
             <div className="md:col-span-2">

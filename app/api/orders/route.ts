@@ -6,6 +6,7 @@ import {
   upsertUserProfile,
 } from "@/lib/firebase/firestore-admin";
 import { PRINT_TYPES, SIDE_TYPES } from "@/lib/utils/constants";
+import { MAX_COPIES_PER_ORDER } from "@/lib/utils/constants";
 
 export async function POST(request: Request) {
   try {
@@ -52,6 +53,12 @@ export async function POST(request: Request) {
     const numericCopies = Number(copies);
     if (!Number.isInteger(numericCopies) || numericCopies < 1) {
       return NextResponse.json({ error: "Copies must be at least 1." }, { status: 400 });
+    }
+    if (numericCopies > MAX_COPIES_PER_ORDER) {
+      return NextResponse.json(
+        { error: `Copies cannot exceed ${MAX_COPIES_PER_ORDER}.` },
+        { status: 400 },
+      );
     }
 
     const numericPageCount = Number(pageCount);

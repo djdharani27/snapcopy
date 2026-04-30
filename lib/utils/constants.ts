@@ -23,4 +23,5 @@ export const ACCEPTED_FILE_TYPES = [
 export const ACCEPTED_FILE_EXTENSIONS = ".pdf,.doc,.docx,.png,.jpg,.jpeg";
 export const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024;
 export const MAX_FILES_PER_ORDER = 10;
-export const SNAPCOPY_PLATFORM_FEE_PAISE = 100;
+export const MAX_COPIES_PER_ORDER = 10;
+export const SNAPCOPY_PLATFORM_FEE_PAISE = 0;
