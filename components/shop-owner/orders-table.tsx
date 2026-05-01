@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  formatCurrency,
   formatDate,
   formatFileSize,
   formatTrackingId,
@@ -345,17 +344,10 @@ export function OrdersTable({ orders }: { orders: OrderWithFiles[] }) {
                 <p>{order.sideType === "double_side" ? "Double side" : "Single side"}</p>
                 <p>{order.pageCount || 0} pages</p>
                 <p>{order.copies} copies</p>
-                {order.transferableAmountPaise !== null && order.transferableAmountPaise !== undefined ? (
-                  <p className="font-semibold text-slate-900">
-                    You receive: {formatCurrency(order.transferableAmountPaise / 100)}
-                  </p>
-                ) : order.shopEarningPaise !== null && order.shopEarningPaise !== undefined ? (
-                  <p className="font-semibold text-slate-900">
-                    You receive: {formatCurrency(order.shopEarningPaise / 100)}
-                  </p>
-                ) : (
+                {order.transferableAmountPaise === null &&
+                order.shopEarningPaise === null ? (
                   <p className="font-semibold text-slate-900">Awaiting quote</p>
-                )}
+                ) : null}
                 {order.transferStatus && order.transferStatus !== "not_created" ? (
                   <p>Route transfer: {order.transferStatus}</p>
                 ) : null}
