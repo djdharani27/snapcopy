@@ -54,8 +54,13 @@ export function statusLabel(status: OrderStatus, paymentStatus?: PaymentStatus |
   if (status === "in_progress") return "In progress";
   if (status === "ready_for_pickup") return "Ready for pickup";
   if (status === "completed") return "Completed";
+  if (paymentStatus === "paid") return "Payment received";
   if (paymentStatus === "quote_pending") return "Awaiting quote";
   if (paymentStatus === "ready_to_pay") return "Ready to pay";
+  if (paymentStatus === "payment_failed") return "Payment failed";
+  if (paymentStatus === "refund_pending") return "Refund pending";
+  if (paymentStatus === "refunded") return "Refunded";
+  if (paymentStatus === "refund_failed") return "Refund failed";
   return "Pending payment";
 }
 
@@ -64,8 +69,13 @@ export function customerStatusLabel(status: OrderStatus, paymentStatus?: Payment
   if (status === "in_progress") return "Printing in progress";
   if (status === "ready_for_pickup") return "Ready for pickup";
   if (status === "completed") return "Picked up";
+  if (paymentStatus === "paid") return "Payment received";
   if (paymentStatus === "quote_pending") return "Waiting for shop price";
   if (paymentStatus === "ready_to_pay") return "Ready to pay";
+  if (paymentStatus === "payment_failed") return "Payment failed";
+  if (paymentStatus === "refund_pending") return "Refund in progress";
+  if (paymentStatus === "refunded") return "Refunded";
+  if (paymentStatus === "refund_failed") return "Refund failed";
   return "Awaiting payment";
 }
 

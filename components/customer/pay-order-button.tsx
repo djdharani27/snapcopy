@@ -3,6 +3,7 @@
 import Script from "next/script";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { shouldMarkCheckoutOpenTimeout } from "@/lib/payments/checkout-open-timeout";
 
 declare global {
   interface Window {
@@ -88,6 +89,8 @@ export function PayOrderButton({
     }
 
     let checkoutOpened = false;
+    let checkoutWasDismissed = false;
+    let paymentVerificationStarted = false;
     let openTimeout: ReturnType<typeof setTimeout> | null = null;
 
     setErrorMessage("");
@@ -154,6 +157,8 @@ export function PayOrderButton({
           contact: phone || "",
         },
         handler: async (response: Record<string, string>) => {
+          paymentVerificationStarted = true;
+
           if (openTimeout) {
             clearTimeout(openTimeout);
             openTimeout = null;
@@ -202,6 +207,8 @@ export function PayOrderButton({
         },
         modal: {
           ondismiss: () => {
+            checkoutWasDismissed = true;
+
             if (openTimeout) {
               clearTimeout(openTimeout);
               openTimeout = null;
@@ -217,7 +224,13 @@ export function PayOrderButton({
       });
 
       openTimeout = setTimeout(() => {
-        if (!checkoutOpened) {
+        if (
+          !shouldMarkCheckoutOpenTimeout({
+            checkoutWasOpened: checkoutOpened,
+            checkoutWasDismissed,
+            paymentVerificationStarted,
+          })
+        ) {
           return;
         }
 
