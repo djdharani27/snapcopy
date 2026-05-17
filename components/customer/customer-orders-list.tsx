@@ -14,31 +14,20 @@ import {
 import type { OrderStatus, OrderWithFiles, PaymentStatus, Shop, UserProfile } from "@/types";
 
 function getJourneySteps(status: OrderStatus, paymentStatus?: PaymentStatus | null) {
-  const quoteReady =
-    paymentStatus === "ready_to_pay" ||
-    paymentStatus === "payment_failed" ||
+  const ordered =
     paymentStatus === "paid" ||
     status === "confirmed" ||
     status === "in_progress" ||
     status === "ready_for_pickup" ||
     status === "completed";
-  const paymentDone =
-    paymentStatus === "paid" ||
-    status === "confirmed" ||
-    status === "in_progress" ||
-    status === "ready_for_pickup" ||
-    status === "completed";
-  const printingStarted =
+  const inProgress =
     status === "in_progress" || status === "ready_for_pickup" || status === "completed";
-  const pickupReady = status === "ready_for_pickup" || status === "completed";
-  const pickedUp = status === "completed";
+  const readyForPickup = status === "ready_for_pickup" || status === "completed";
 
   return [
-    { label: "Request sent", complete: true },
-    { label: "Shop pricing", complete: quoteReady },
-    { label: "Payment", complete: paymentDone },
-    { label: "Printing", complete: printingStarted },
-    { label: "Pickup", complete: pickupReady || pickedUp },
+    { label: "Ordered", complete: ordered },
+    { label: "Order in progress", complete: inProgress },
+    { label: "Ready for pickup", complete: readyForPickup },
   ];
 }
 
@@ -185,22 +174,36 @@ export function CustomerOrdersList({
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                {journeySteps.map((step, index) => (
-                  <div
-                    key={step.label}
-                    className={
-                      step.complete
-                        ? "rounded-[24px] border border-[#d9c4b4] bg-[#fff4ea] px-4 py-4 text-[#8f441a]"
-                        : "rounded-[24px] border border-[#eadfd3] bg-white px-4 py-4 text-[#8e7b6e]"
-                    }
-                  >
-                    <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em]">
-                      {String(index + 1).padStart(2, "0")}
-                    </p>
-                    <p className="mt-2 text-sm font-semibold">{step.label}</p>
-                  </div>
-                ))}
+              <div className="rounded-[28px] border border-[#eadfd3] bg-[rgba(255,250,245,0.92)] px-4 py-5 sm:px-5">
+                <div className="flex items-center gap-2 overflow-x-auto">
+                  {journeySteps.map((step, index) => (
+                    <div key={step.label} className="flex min-w-0 flex-1 items-center gap-2">
+                      <div className="flex min-w-[110px] flex-col items-center text-center sm:min-w-[140px]">
+                        <div
+                          className={
+                            step.complete
+                              ? "flex h-11 w-11 items-center justify-center rounded-full bg-[#221c18] text-sm font-semibold text-white"
+                              : "flex h-11 w-11 items-center justify-center rounded-full border border-[#d8cabd] bg-white text-sm font-semibold text-[#8e7b6e]"
+                          }
+                        >
+                          {index + 1}
+                        </div>
+                        <p
+                          className={
+                            step.complete
+                              ? "mt-3 text-sm font-semibold text-slate-900"
+                              : "mt-3 text-sm font-semibold text-[#8e7b6e]"
+                          }
+                        >
+                          {step.label}
+                        </p>
+                      </div>
+                      {index < journeySteps.length - 1 ? (
+                        <div className="h-[2px] flex-1 rounded-full bg-[#ddc9b9]" aria-hidden="true" />
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_320px]">
