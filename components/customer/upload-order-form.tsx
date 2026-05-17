@@ -12,6 +12,25 @@ import {
 import { formatTrackingId } from "@/lib/utils/format";
 import type { Shop, UserProfile } from "@/types";
 
+type PrintIntent = "hall_ticket" | "lab_manual" | "other";
+
+const PRINT_INTENT_OPTIONS: Array<{
+  value: PrintIntent;
+  label: string;
+}> = [
+  { value: "hall_ticket", label: "Print hall ticket" },
+  { value: "lab_manual", label: "Print lab manual" },
+  { value: "other", label: "Print other" },
+];
+
+function buildNotes(printIntent: PrintIntent, notes: FormDataEntryValue | null) {
+  const intentLabel =
+    PRINT_INTENT_OPTIONS.find((option) => option.value === printIntent)?.label ?? "Print other";
+  const trimmedNotes = String(notes || "").trim();
+
+  return trimmedNotes ? `${intentLabel}\n${trimmedNotes}` : intentLabel;
+}
+
 export function UploadOrderForm({
   shops,
   profile,
@@ -28,6 +47,7 @@ export function UploadOrderForm({
   const [createdTrackingCode, setCreatedTrackingCode] = useState("");
   const [error, setError] = useState("");
   const [submittedShop, setSubmittedShop] = useState<Shop | null>(null);
+  const [printIntent, setPrintIntent] = useState<PrintIntent>("hall_ticket");
   const [printType, setPrintType] = useState<"color" | "black_white">("black_white");
   const [sideType, setSideType] = useState<"single_side" | "double_side">("single_side");
   const [pageCount, setPageCount] = useState(1);
@@ -111,7 +131,7 @@ export function UploadOrderForm({
           customerName: formData.get("customerName"),
           customerPhone: formData.get("customerPhone"),
           shopId: selectedShopId,
-          notes: formData.get("notes"),
+          notes: buildNotes(printIntent, formData.get("notes")),
           printType: formData.get("printType"),
           sideType: formData.get("sideType"),
           pageCount: Number(formData.get("pageCount")),
@@ -127,6 +147,7 @@ export function UploadOrderForm({
 
       setSubmittedShop(selectedShop);
       form.reset();
+      setPrintIntent("hall_ticket");
       setPrintType("black_white");
       setSideType("single_side");
       setPageCount(1);
@@ -147,30 +168,49 @@ export function UploadOrderForm({
 
   return (
     <form onSubmit={handleSubmit} className="panel-strong p-4 sm:p-6">
-      <div className="mb-6">
-        <p className="eyebrow">Order builder</p>
-        <h2 className="mt-2 text-xl font-semibold tracking-[-0.04em] text-slate-900 sm:text-2xl">
-          Build your print request
-        </h2>
-        <p className="mt-3 text-sm leading-7 text-slate-600">
-          Add files, pick the shop, confirm the print specs, then send. Formats: PDF, DOC, DOCX,
-          PNG, JPG. Maximum 10 files, 15 MB each. The shop will review the order and set the final
-          payment amount before you pay.
-        </p>
-      </div>
-
       <div className="space-y-5">
         <section className="rounded-[28px] border border-[#eadfd3] bg-[rgba(255,248,241,0.82)] p-4 sm:p-5">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
             <div>
               <p className="label">Step 1</p>
               <h3 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-slate-900">
-                Add files and pick the shop
+                What do you want to print?
               </h3>
             </div>
             <div className="inline-flex w-fit self-start rounded-full bg-[#f5decc] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#9c4c20]">
               Required
             </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            {PRINT_INTENT_OPTIONS.map((option) => {
+              const isSelected = option.value === printIntent;
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setPrintIntent(option.value)}
+                  className={
+                    isSelected
+                      ? "rounded-[24px] border border-[#c96d38] bg-[#fff6ef] px-4 py-4 text-left text-sm font-semibold text-[#8f4319] shadow-[0_14px_24px_rgba(201,109,56,0.14)]"
+                      : "rounded-[24px] border border-[#eadfd3] bg-white px-4 py-4 text-left text-sm font-medium text-slate-700 transition hover:border-[#d8b49a] hover:bg-[#fff9f4]"
+                  }
+                  {...hydrationSafeProps}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="rounded-[28px] border border-[#eadfd3] bg-[rgba(255,248,241,0.82)] p-4 sm:p-5">
+          <div className="mb-4">
+            <p className="label">Step 2</p>
+            <h3 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-slate-900">
+              Upload document
+            </h3>
           </div>
 
           <input
@@ -183,11 +223,22 @@ export function UploadOrderForm({
             required
             {...hydrationSafeProps}
           />
+        </section>
 
-          <div className="mt-4">
-            <label className="label" htmlFor="shopId">
-              Print shop
-            </label>
+        <section className="rounded-[28px] border border-[#eadfd3] bg-[rgba(255,253,249,0.86)] p-4 sm:p-5">
+          <div className="mb-4">
+            <p className="label">Step 3</p>
+            <h3 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-slate-900">
+              Select shop
+            </h3>
+          </div>
+
+          {initialShopId && shops.length === 1 ? (
+            <div className="rounded-[24px] border border-[#eadfd3] bg-[rgba(255,247,239,0.95)] px-4 py-4">
+              <p className="text-sm font-semibold text-slate-900">{selectedShop?.shopName}</p>
+              <p className="mt-1 text-sm text-slate-600">{selectedShop?.address}</p>
+            </div>
+          ) : (
             <select
               id="shopId"
               name="shopId"
@@ -206,15 +257,14 @@ export function UploadOrderForm({
                 </option>
               ))}
             </select>
-          </div>
-
+          )}
         </section>
 
         <section className="rounded-[28px] border border-[#eadfd3] bg-[rgba(255,253,249,0.86)] p-4 sm:p-5">
           <div className="mb-4">
-            <p className="label">Step 2</p>
+            <p className="label">Step 4</p>
             <h3 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-slate-900">
-              Confirm your details
+              Your details
             </h3>
           </div>
 
@@ -255,7 +305,7 @@ export function UploadOrderForm({
 
         <section className="rounded-[28px] border border-[#eadfd3] bg-[rgba(255,248,241,0.7)] p-4 sm:p-5">
           <div className="mb-4">
-            <p className="label">Step 3</p>
+            <p className="label">Step 5</p>
             <h3 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-slate-900">
               Print style
             </h3>
@@ -336,14 +386,14 @@ export function UploadOrderForm({
 
             <div className="md:col-span-2">
               <label className="label" htmlFor="notes">
-                Notes
+                Extra note
               </label>
               <textarea
                 id="notes"
                 name="notes"
                 rows={4}
                 className="input min-h-28"
-                placeholder="Optional instructions for the shop"
+                placeholder="Optional"
                 {...hydrationSafeProps}
               />
             </div>
@@ -353,16 +403,13 @@ export function UploadOrderForm({
 
       {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
       <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-[#776b61]">
-          Orders are submitted first. The shop owner will review your files and set the final amount before payment.
-        </p>
         <button
           type="submit"
           disabled={loading || showSuccessDialog}
-          className="btn-primary w-full sm:w-auto"
+          className="btn-primary w-full sm:ml-auto sm:w-auto"
           {...hydrationSafeProps}
         >
-          {loading ? "Submitting..." : "Send print order"}
+          {loading ? "Submitting..." : "Proceed"}
         </button>
       </div>
 
@@ -371,8 +418,7 @@ export function UploadOrderForm({
           <div className="panel-strong w-full max-w-sm p-6">
             <h3 className="text-xl font-semibold text-slate-900">Order sent</h3>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Your documents were sent to {submittedShop?.shopName || "the selected shop"}. Click
-              OK to go back to your orders. Payment will unlock after the shop sets the final amount.
+              Sent to {submittedShop?.shopName || "the selected shop"}.
             </p>
             {createdTrackingCode ? (
               <p className="mt-3 text-sm text-slate-700">

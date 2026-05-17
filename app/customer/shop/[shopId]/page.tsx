@@ -34,7 +34,7 @@ export default async function CustomerShopPage({
     <DashboardShell
       profile={profile}
       title={shop.shopName}
-      description={shop.description || shop.address}
+      description={shop.address}
       navigation={<CustomerNav active="shops" />}
       actions={
         <>
@@ -47,9 +47,6 @@ export default async function CustomerShopPage({
     >
       <div className="mb-5 grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
         <div className="panel-dark p-6">
-          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[#ffc89b]">
-            Shop details
-          </p>
           <p className="mt-4 text-sm leading-7 text-[#f0ded0]">{shop.address}</p>
           <div className="mt-4 flex flex-wrap gap-3">
             <a href={`tel:${shop.phone}`} className="btn-secondary">
@@ -63,7 +60,6 @@ export default async function CustomerShopPage({
           </div>
         </div>
         <div className="panel p-5">
-          <p className="eyebrow">Services</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {shop.services?.length ? (
               shop.services.map((service) => (
@@ -89,14 +85,10 @@ export default async function CustomerShopPage({
 
       <div className="mt-5">
         <div className="panel p-5 text-sm text-slate-700">
-          <p className="eyebrow">Price list</p>
           <p className="mt-3">B/W single: {formatCurrency(shop.pricing.blackWhiteSingle)}</p>
           <p>B/W double: {formatCurrency(shop.pricing.blackWhiteDouble)}</p>
           <p>Color single: {formatCurrency(shop.pricing.colorSingle)}</p>
           <p>Color double: {formatCurrency(shop.pricing.colorDouble)}</p>
-          <p className="mt-3 text-xs text-slate-500">
-            Final order total is calculated on the backend in paise from this rate card, selected page count, and copies.
-          </p>
         </div>
       </div>
     </DashboardShell>

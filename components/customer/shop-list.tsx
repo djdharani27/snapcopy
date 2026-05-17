@@ -32,10 +32,7 @@ export function ShopList({
       <div className="panel p-4 sm:p-5">
         <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="eyebrow">Explore shops</p>
-            <p className="mt-2 text-sm text-[#62584f]">
-              Search by shop name, area, or service.
-            </p>
+            <p className="eyebrow">Find shop</p>
           </div>
           <div className="inline-flex w-fit rounded-full bg-[#f6e3d5] px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#9c4c20]">
             {filteredShops.length} visible
@@ -45,7 +42,7 @@ export function ShopList({
         <input
           id="shop-search"
           className="input"
-          placeholder="Try: Anna Nagar, color print, thesis binding"
+          placeholder="Search shop or area"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           {...hydrationSafeProps}
@@ -66,7 +63,7 @@ export function ShopList({
               <div className="flex flex-1 flex-col gap-5">
                 <div className="flex items-start justify-between gap-4">
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-[#9c4c20]">
-                    Print Partner
+                    Shop
                   </p>
                   <span className="inline-flex shrink-0 items-center rounded-full bg-[#f5e5d7] px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#9c4c20]">
                     Open
@@ -79,12 +76,7 @@ export function ShopList({
                   </h2>
 
                   <div className="rounded-[24px] border border-[#eadfd3] bg-[rgba(255,247,239,0.95)] p-4">
-                    <p className="line-clamp-2 text-sm leading-6 text-slate-600">
-                      {shop.description || "Local Xerox and print service."}
-                    </p>
-                    <p className="line-clamp-2 mt-3 text-sm leading-6 text-[#6b5d52]">
-                      {shop.address}
-                    </p>
+                    <p className="line-clamp-2 text-sm leading-6 text-[#6b5d52]">{shop.address}</p>
                   </div>
                 </div>
 
