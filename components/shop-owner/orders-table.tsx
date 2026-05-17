@@ -362,7 +362,9 @@ export function OrdersTable({ orders }: { orders: OrderWithFiles[] }) {
                   </div>
                 ) : null}
                 <p className="mb-2 text-sm font-semibold text-slate-900">Notes</p>
-                <p className="text-sm leading-6 text-slate-600">{order.notes || "No notes provided."}</p>
+                <p className="whitespace-pre-line text-sm leading-6 text-slate-600">
+                  {order.notes || "No notes provided."}
+                </p>
 
                 <div className="mt-5">
                   <p className="mb-3 text-sm font-semibold text-slate-900">Files</p>

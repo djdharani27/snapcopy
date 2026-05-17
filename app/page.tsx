@@ -34,10 +34,6 @@ export default function HomePage() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div className="max-w-3xl">
                 <p className="eyebrow">SnapCopy</p>
-                <p className="mt-4 max-w-2xl text-base leading-7 text-[#5f554c] sm:text-lg">
-                  Pick what you want, upload one file, see the estimate, and choose a nearby print
-                  shop.
-                </p>
               </div>
 
               <div className="flex flex-wrap gap-3">

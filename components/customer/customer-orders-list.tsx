@@ -72,17 +72,13 @@ export function CustomerOrdersList({
   if (orders.length === 0) {
     return (
       <div className="panel p-10 text-center">
-        <p className="eyebrow">No active orders</p>
+        <p className="eyebrow">No orders</p>
         <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-900">
-          Nothing to track yet.
+          No orders yet.
         </h2>
-        <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-600">
-          Start from a print category, upload a file, and your live order journey will show up
-          here.
-        </p>
         <div className="mt-5">
           <Link href="/customer/shops" className="btn-primary">
-            Browse print options
+            Start order
           </Link>
         </div>
       </div>

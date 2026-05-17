@@ -24,13 +24,7 @@ export default async function CustomerOrdersPage({
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="eyebrow">Live order tracking</p>
-                <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-slate-900 sm:text-5xl">
-                  Track your print orders like deliveries.
-                </h1>
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-[#65594f] sm:text-base">
-                  Watch the order move from request to quote, payment, printing, and pickup.
-                </p>
+                <p className="eyebrow">Your orders</p>
               </div>
 
               <div className="flex flex-wrap gap-3">

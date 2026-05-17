@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PRINT_CATEGORY_VISUALS } from "@/lib/utils/print-category-visuals";
 import {
@@ -143,21 +143,24 @@ function buildOrderNotes(params: {
   sideType: SideType;
   pageCount: number;
   copies: number;
-  estimateRupees: number;
   userNotes: string;
 }) {
   const categoryMeta = getCategoryMeta(params.category);
+  const trimmedUserNotes = params.userNotes.trim();
   const noteLines = [
-    `Category: ${categoryMeta.label}`,
+    `Request: ${categoryMeta.label}`,
     `Print: ${params.printType === "color" ? "Color" : "B/W"}`,
     `Sides: ${params.sideType === "double_side" ? "Double side" : "Single side"}`,
     `Pages: ${params.pageCount}`,
     `Copies: ${params.copies}`,
-    `Estimated total: ${formatCurrency(params.estimateRupees)}`,
   ];
 
-  if (params.userNotes.trim()) {
-    noteLines.push(`Customer note: ${params.userNotes.trim()}`);
+  if (params.category === "other") {
+    noteLines.push(
+      `Document details: ${trimmedUserNotes || "Other document requested. No extra details added."}`,
+    );
+  } else if (trimmedUserNotes) {
+    noteLines.push(`Customer note: ${trimmedUserNotes}`);
   }
 
   return noteLines.join("\n");
@@ -219,6 +222,7 @@ export function PrintMarketplace({
 }) {
   const router = useRouter();
   const hydrationSafeProps = { suppressHydrationWarning: true as const };
+  const uploadSectionRef = useRef<HTMLElement | null>(null);
   const [category, setCategory] = useState<PrintCategory | null>(initialCategory ?? null);
   const [printType, setPrintType] = useState<PrintType>("black_white");
   const [sideType, setSideType] = useState<SideType>("single_side");
@@ -248,6 +252,21 @@ export function PrintMarketplace({
       setSelectedShopId(fixedShopId);
     }
   }, [fixedShopId]);
+
+  useEffect(() => {
+    if (!category) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      uploadSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [category]);
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -456,7 +475,6 @@ export function PrintMarketplace({
             sideType,
             pageCount: detectedPageCount,
             copies,
-            estimateRupees,
             userNotes: notes,
           }),
           printType,
@@ -491,14 +509,7 @@ export function PrintMarketplace({
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
-              <p className="eyebrow">Start your order</p>
-              <h2 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-slate-900 sm:text-4xl">
-                Pick what you want to print first.
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-[#65594f] sm:text-base">
-                Nothing else opens until the print type is chosen. That keeps the flow closer to
-                browsing on Zomato instead of filling one long form.
-              </p>
+              <p className="eyebrow">Choose print</p>
             </div>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -569,21 +580,8 @@ export function PrintMarketplace({
         </div>
       </section>
 
-      {!hasChosenCategory ? (
-        <section className="panel p-6 text-center">
-          <p className="eyebrow">Locked until category is chosen</p>
-          <h3 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-900">
-            Select Hall Ticket, Lab Manual, or Other Prints
-          </h3>
-          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-            Upload, shop cards, print settings, and the estimate stay hidden until the user makes
-            that first choice.
-          </p>
-        </section>
-      ) : null}
-
       {hasChosenCategory && categoryMeta ? (
-        <section className="panel-strong overflow-hidden p-5 sm:p-6">
+        <section ref={uploadSectionRef} className="panel-strong overflow-hidden p-5 sm:p-6">
           <div className="flex flex-col gap-6">
             <div
               className="relative overflow-hidden rounded-[28px] border border-[#e8d8ca] bg-cover bg-center p-5 text-white sm:p-6"
@@ -592,16 +590,11 @@ export function PrintMarketplace({
               <div className="absolute inset-0 bg-gradient-to-r from-[rgba(28,20,16,0.92)] to-[rgba(28,20,16,0.42)]" />
               <div className="relative flex flex-col gap-2">
                 <p className="eyebrow text-[#ffd8bd]">{categoryMeta.label}</p>
-                <h2 className="text-3xl font-semibold tracking-[-0.05em] sm:text-4xl">
-                  Upload your file to unlock the next step
-                </h2>
-                <p className="max-w-xl text-sm leading-6 text-white/80 sm:text-base">
-                  Price, shop cards, and print settings appear only after the upload succeeds.
-                </p>
+                <h2 className="text-3xl font-semibold tracking-[-0.05em] sm:text-4xl">Upload</h2>
               </div>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <div className="grid gap-4">
               <div className="rounded-[28px] border border-[#eadfd3] bg-white p-5">
                 <p className="label">Upload file</p>
                 <label className="mt-3 flex min-h-[170px] cursor-pointer flex-col justify-center rounded-[24px] border border-dashed border-[#d9cabc] bg-[#fff8f1] px-4 text-center transition hover:border-[#c96d38] hover:bg-[#fff3e8]">
@@ -628,32 +621,8 @@ export function PrintMarketplace({
                   ) : null}
                 </label>
               </div>
-
-              <div className="rounded-[28px] border border-[#eadfd3] bg-[rgba(255,248,241,0.9)] p-5">
-                <p className="eyebrow">What opens next</p>
-                <div className="mt-4 space-y-3 text-sm text-slate-700">
-                  <p className="font-semibold text-slate-900">Print options</p>
-                  <p className="font-semibold text-slate-900">
-                    {fixedShopId ? "Shop locked to this store" : "Nearby shop cards + map"}
-                  </p>
-                  <p className="font-semibold text-slate-900">Estimated total and checkout</p>
-                </div>
-              </div>
             </div>
           </div>
-        </section>
-      ) : null}
-
-      {hasChosenCategory && !hasUploadedFile ? (
-        <section className="panel p-6 text-center">
-          <p className="eyebrow">Next step locked</p>
-          <h3 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-900">
-            Upload the document first
-          </h3>
-          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-            The user should not see shop options or pricing before the document is uploaded, so
-            everything else stays hidden here.
-          </p>
         </section>
       ) : null}
 

@@ -34,14 +34,10 @@ export default async function CustomerShopPage({
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="max-w-3xl">
-                <p className="eyebrow">Single shop ordering</p>
+                <p className="eyebrow">Shop</p>
                 <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-slate-900 sm:text-5xl">
                   {shop.shopName}
                 </h1>
-                <p className="mt-3 text-sm leading-6 text-[#65594f] sm:text-base">
-                  Choose the print category first, upload the file, then finish the order for this
-                  specific shop.
-                </p>
               </div>
 
               <div className="flex flex-wrap gap-3">
