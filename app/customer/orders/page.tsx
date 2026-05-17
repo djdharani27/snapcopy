@@ -1,13 +1,8 @@
+import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
-import { CustomerOrdersList } from "@/components/customer/customer-orders-list";
-import { CustomerNav } from "@/components/customer/customer-nav";
-import { DashboardShell } from "@/components/layout/dashboard-shell";
-import { RefreshButton } from "@/components/layout/refresh-button";
 import { AutoRefresh } from "@/components/shop-owner/auto-refresh";
-import {
-  getAllShops,
-  getOrdersForCustomer,
-} from "@/lib/firebase/firestore-admin";
+import { CustomerOrdersList } from "@/components/customer/customer-orders-list";
+import { getAllShops, getOrdersForCustomer } from "@/lib/firebase/firestore-admin";
 import { requireRole } from "@/lib/auth/session";
 
 export default async function CustomerOrdersPage({
@@ -19,42 +14,64 @@ export default async function CustomerOrdersPage({
 
   const { decoded, profile } = await requireRole("customer");
   const { order } = await searchParams;
-  const [shops, orders] = await Promise.all([
-    getAllShops(),
-    getOrdersForCustomer(decoded.uid),
-  ]);
+  const [shops, orders] = await Promise.all([getAllShops(), getOrdersForCustomer(decoded.uid)]);
   const shopsById = Object.fromEntries(shops.map((shop) => [shop.id, shop]));
 
   return (
-    <DashboardShell
-      profile={profile}
-      title="Your orders"
-      description="Track print requests, final amounts, and payment status."
-      hideIntro
-      navigation={<CustomerNav active="orders" />}
-      actions={<RefreshButton />}
-    >
-      <div className="space-y-6">
+    <main className="page-shell min-h-screen">
+      <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+        <header className="panel-strong mb-6 overflow-hidden p-5 sm:p-6">
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="eyebrow">Live order tracking</p>
+                <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-slate-900 sm:text-5xl">
+                  Track your print orders like deliveries.
+                </h1>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-[#65594f] sm:text-base">
+                  Watch the order move from request to quote, payment, printing, and pickup.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <Link href="/customer/shops" className="btn-primary">
+                  Start a new order
+                </Link>
+                <Link href="/" className="btn-secondary">
+                  Home
+                </Link>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-[#eadfd3] bg-[rgba(255,248,241,0.9)] px-4 py-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{profile.name}</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-[#8e7b6e]">Customer view</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Link href="/customer/shops" className="nav-pill">
+                  Browse
+                </Link>
+                <Link href="/customer/orders" className="nav-pill-active">
+                  Track
+                </Link>
+              </div>
+            </div>
+          </div>
+        </header>
+
         <AutoRefresh customerId={decoded.uid} />
+
         {order === "sent" ? (
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-            Order sent successfully.
+          <div className="mb-6 rounded-[24px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+            Order placed. The shop will review the document and update the next step here.
           </div>
         ) : null}
+
         <section id="orders">
-          <div className="mb-4">
-            <h2 className="text-xl font-semibold text-slate-900">Recent orders</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Track whether your order is sent, in progress, or printed.
-            </p>
-          </div>
-          <CustomerOrdersList
-            orders={orders}
-            shopsById={shopsById}
-            profile={profile}
-          />
+          <CustomerOrdersList orders={orders} shopsById={shopsById} profile={profile} />
         </section>
       </div>
-    </DashboardShell>
+    </main>
   );
 }

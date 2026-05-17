@@ -52,10 +52,14 @@ export default async function CustomerShopsPage({
 
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
-              <p className="eyebrow">Nearest shops, live estimate, one-file order</p>
+              <p className="eyebrow">Browse like food delivery</p>
               <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-slate-900 sm:text-5xl">
-                Browse prints like a marketplace, not a form.
+                Choose the print category first. Everything else opens after that.
               </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-[#65594f] sm:text-base">
+                The experience is staged on purpose: category, upload, options, shop, then order.
+                No default card, no long form, no early pricing.
+              </p>
             </div>
             <div className="rounded-[24px] bg-[rgba(255,245,235,0.9)] px-4 py-3 text-sm text-[#6b5d52]">
               Signed in as <span className="font-semibold text-slate-900">{profile.name}</span>

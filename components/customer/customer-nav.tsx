@@ -17,14 +17,14 @@ export function CustomerNav({
         aria-current={active === "shops" ? "page" : undefined}
         className={active === "shops" ? "nav-pill-active" : "nav-pill"}
       >
-        Shops
+        Browse
       </Link>
       <Link
         href="/customer/orders"
         aria-current={active === "orders" ? "page" : undefined}
         className={active === "orders" ? "nav-pill-active" : "nav-pill"}
       >
-        Orders
+        Track
       </Link>
     </nav>
   );
