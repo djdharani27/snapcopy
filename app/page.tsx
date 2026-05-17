@@ -34,9 +34,6 @@ export default function HomePage() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div className="max-w-3xl">
                 <p className="eyebrow">SnapCopy</p>
-                <h1 className="mt-3 text-4xl font-semibold tracking-[-0.07em] text-slate-900 sm:text-5xl lg:text-7xl">
-                  Order prints the way you order food.
-                </h1>
                 <p className="mt-4 max-w-2xl text-base leading-7 text-[#5f554c] sm:text-lg">
                   Pick what you want, upload one file, see the estimate, and choose a nearby print
                   shop.
