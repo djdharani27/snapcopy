@@ -23,11 +23,12 @@ function getJourneySteps(status: OrderStatus, paymentStatus?: PaymentStatus | nu
   const inProgress =
     status === "in_progress" || status === "ready_for_pickup" || status === "completed";
   const readyForPickup = status === "ready_for_pickup" || status === "completed";
+  const activeIndex = !ordered ? 0 : !inProgress ? 1 : !readyForPickup ? 2 : 2;
 
   return [
-    { label: "Ordered", complete: ordered },
-    { label: "Order in progress", complete: inProgress },
-    { label: "Ready for pickup", complete: readyForPickup },
+    { label: "Ordered", complete: ordered, active: activeIndex === 0 },
+    { label: "Order in progress", complete: inProgress, active: activeIndex === 1 },
+    { label: "Ready for pickup", complete: readyForPickup, active: activeIndex === 2 },
   ];
 }
 
@@ -182,8 +183,14 @@ export function CustomerOrdersList({
                         <div
                           className={
                             step.complete
-                              ? "flex h-11 w-11 items-center justify-center rounded-full bg-[#221c18] text-sm font-semibold text-white"
-                              : "flex h-11 w-11 items-center justify-center rounded-full border border-[#d8cabd] bg-white text-sm font-semibold text-[#8e7b6e]"
+                              ? `tracker-node tracker-node-complete ${
+                                  step.active
+                                    ? "tracker-node-active flex h-11 w-11 items-center justify-center rounded-full bg-[#221c18] text-sm font-semibold text-white"
+                                    : "flex h-11 w-11 items-center justify-center rounded-full bg-[#221c18] text-sm font-semibold text-white"
+                                }`
+                              : step.active
+                                ? "tracker-node tracker-node-active flex h-11 w-11 items-center justify-center rounded-full border border-[#c96d38] bg-[#fff4ea] text-sm font-semibold text-[#9c4c20]"
+                                : "tracker-node flex h-11 w-11 items-center justify-center rounded-full border border-[#d8cabd] bg-white text-sm font-semibold text-[#8e7b6e]"
                           }
                         >
                           {index + 1}
@@ -192,14 +199,25 @@ export function CustomerOrdersList({
                           className={
                             step.complete
                               ? "mt-3 text-sm font-semibold text-slate-900"
-                              : "mt-3 text-sm font-semibold text-[#8e7b6e]"
+                              : step.active
+                                ? "mt-3 text-sm font-semibold text-[#9c4c20]"
+                                : "mt-3 text-sm font-semibold text-[#8e7b6e]"
                           }
                         >
                           {step.label}
                         </p>
                       </div>
                       {index < journeySteps.length - 1 ? (
-                        <div className="h-[2px] flex-1 rounded-full bg-[#ddc9b9]" aria-hidden="true" />
+                        <div className="relative h-[2px] flex-1 overflow-hidden rounded-full bg-[#ddc9b9]" aria-hidden="true">
+                          <div
+                            className={
+                              step.complete
+                                ? "tracker-line-fill absolute inset-y-0 left-0 rounded-full bg-[#221c18]"
+                                : "absolute inset-y-0 left-0 rounded-full bg-transparent"
+                            }
+                            style={{ width: step.complete ? "100%" : "0%" }}
+                          />
+                        </div>
                       ) : null}
                     </div>
                   ))}
