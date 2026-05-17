@@ -50,7 +50,6 @@ export function UploadOrderForm({
   const [printIntent, setPrintIntent] = useState<PrintIntent>("hall_ticket");
   const [printType, setPrintType] = useState<"color" | "black_white">("black_white");
   const [sideType, setSideType] = useState<"single_side" | "double_side">("single_side");
-  const [pageCount, setPageCount] = useState(1);
   const [copies, setCopies] = useState(1);
   const [selectedShopId, setSelectedShopId] = useState(initialShopId || shops[0]?.id || "");
 
@@ -101,9 +100,7 @@ export function UploadOrderForm({
 
       files.forEach((file) => {
         if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
-          throw new Error(
-            `${file.name} is not supported. Allowed: PDF, DOC, DOCX, PNG, JPG.`,
-          );
+          throw new Error(`${file.name} is not supported. Allowed: PDF, PNG, JPG.`);
         }
 
         if (file.size > MAX_FILE_SIZE_BYTES) {
@@ -134,7 +131,6 @@ export function UploadOrderForm({
           notes: buildNotes(printIntent, formData.get("notes")),
           printType: formData.get("printType"),
           sideType: formData.get("sideType"),
-          pageCount: Number(formData.get("pageCount")),
           copies: requestedCopies,
           files: uploadResult.files,
         }),
@@ -150,7 +146,6 @@ export function UploadOrderForm({
       setPrintIntent("hall_ticket");
       setPrintType("black_white");
       setSideType("single_side");
-      setPageCount(1);
       setCopies(1);
       setSelectedShopId(initialShopId || shops[0]?.id || "");
       setCreatedTrackingCode(orderResult.order?.trackingCode || orderResult.order?.id || "");
@@ -352,17 +347,13 @@ export function UploadOrderForm({
               <label className="label" htmlFor="pageCount">
                 Page count
               </label>
-              <input
+              <div
                 id="pageCount"
-                name="pageCount"
-                type="number"
-                min="1"
-                value={pageCount}
-                onChange={(event) => setPageCount(Number(event.target.value) || 1)}
-                className="input"
-                required
+                className="input flex items-center text-[#6f6257]"
                 {...hydrationSafeProps}
-              />
+              >
+                Auto-detected from the uploaded file
+              </div>
             </div>
 
             <div>

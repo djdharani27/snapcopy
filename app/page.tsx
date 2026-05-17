@@ -66,11 +66,16 @@ export default function HomePage() {
                     aria-hidden="true"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[rgba(18,14,11,0.94)] via-[rgba(18,14,11,0.4)] to-[rgba(18,14,11,0.08)]" />
+                  {card.title === "Other Prints" ? (
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                      <div className="translate-y-1 text-[9rem] font-semibold leading-none tracking-[-0.08em] text-white drop-shadow-[0_20px_40px_rgba(15,23,42,0.5)] sm:text-[10.5rem]">
+                        +
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="relative flex min-h-[320px] flex-col justify-between p-5 text-white sm:min-h-[380px] sm:p-6">
                     <div className="flex items-start justify-between">
-                      <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/18 text-sm font-bold tracking-[0.22em] backdrop-blur">
-                        {card.icon}
-                      </span>
+                      <span />
                       <span className="rounded-full bg-white/14 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] backdrop-blur">
                         Start
                       </span>

@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { requireApiRole } from "@/lib/auth/session";
 import { uploadBufferToS3 } from "@/lib/aws/s3";
+import { detectDocumentPageCount } from "@/lib/utils/document-page-count";
 import {
   ACCEPTED_FILE_TYPES,
   MAX_FILE_SIZE_BYTES,
@@ -44,6 +45,11 @@ export async function POST(request: Request) {
           : "bin";
         const key = `orders/${decoded.uid}/${Date.now()}-${randomUUID()}.${extension}`;
         const buffer = Buffer.from(await file.arrayBuffer());
+        const pageCount = detectDocumentPageCount({
+          buffer,
+          mimeType: file.type || "application/octet-stream",
+          fileName: file.name,
+        });
         const upload = await uploadBufferToS3({
           key,
           buffer,
@@ -56,11 +62,15 @@ export async function POST(request: Request) {
           s3Url: upload.url,
           mimeType: file.type || "application/octet-stream",
           size: file.size,
+          pageCount,
         };
       }),
     );
 
-    return NextResponse.json({ files: uploadedFiles });
+    return NextResponse.json({
+      files: uploadedFiles,
+      totalPageCount: uploadedFiles.reduce((sum, file) => sum + file.pageCount, 0),
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Upload failed." },

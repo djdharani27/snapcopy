@@ -22,6 +22,15 @@ type MarketplaceShop = Shop & {
   distanceKm: number | null;
 };
 
+type UploadedOrderFile = {
+  originalFileName: string;
+  s3Key: string;
+  s3Url: string;
+  mimeType: string;
+  size: number;
+  pageCount: number;
+};
+
 const CATEGORY_OPTIONS: Array<{
   id: PrintCategory;
   label: string;
@@ -179,14 +188,16 @@ export function PrintMarketplace({
   const [category, setCategory] = useState<PrintCategory>(initialCategory || "hall_ticket");
   const [printType, setPrintType] = useState<PrintType>("black_white");
   const [sideType, setSideType] = useState<SideType>("single_side");
-  const [pageCount, setPageCount] = useState(1);
   const [copies, setCopies] = useState(1);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedOrderFile[]>([]);
+  const [detectedPageCount, setDetectedPageCount] = useState<number | null>(null);
   const [selectedShopId, setSelectedShopId] = useState("");
   const [customerPhone, setCustomerPhone] = useState(profile.phone || "");
   const [notes, setNotes] = useState("");
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [createdTrackingCode, setCreatedTrackingCode] = useState("");
@@ -273,28 +284,76 @@ export function PrintMarketplace({
     category,
     printType,
     sideType,
-    pageCount,
+    pageCount: detectedPageCount || 0,
     copies,
   });
   const categoryMeta = getCategoryMeta(category);
-  const canSubmit = Boolean(selectedShop && selectedFile && customerPhone.trim());
+  const hasUploadedFile = Boolean(selectedFile && uploadedFiles.length && detectedPageCount);
+  const canSubmit = Boolean(
+    selectedShop && uploadedFiles.length && detectedPageCount && customerPhone.trim() && !uploadingFile,
+  );
 
   function resetOrderState(nextCategory: PrintCategory) {
     setCategory(nextCategory);
     setPrintType("black_white");
     setSideType("single_side");
-    setPageCount(1);
     setCopies(1);
     setSelectedFile(null);
+    setUploadedFiles([]);
+    setDetectedPageCount(null);
     setNotes("");
     setError("");
     setCreatedTrackingCode("");
     setSubmittedShop(null);
   }
 
-  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] || null;
     setSelectedFile(file);
+    setUploadedFiles([]);
+    setDetectedPageCount(null);
+    setError("");
+
+    if (!file) {
+      return;
+    }
+
+    if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
+      setError("Only PDF, PNG, and JPG files are allowed.");
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setError("File size must be under 15 MB.");
+      return;
+    }
+
+    setUploadingFile(true);
+
+    try {
+      const uploadPayload = new FormData();
+      uploadPayload.append("files", file);
+
+      const uploadResponse = await fetch("/api/uploads", {
+        method: "POST",
+        body: uploadPayload,
+      });
+      const uploadResult = await uploadResponse.json();
+
+      if (!uploadResponse.ok) {
+        throw new Error(uploadResult.error || "File upload failed.");
+      }
+
+      setUploadedFiles(uploadResult.files || []);
+      setDetectedPageCount(Number(uploadResult.totalPageCount || 0));
+    } catch (uploadError) {
+      setSelectedFile(null);
+      setUploadedFiles([]);
+      setDetectedPageCount(null);
+      setError(uploadError instanceof Error ? uploadError.message : "File upload failed.");
+    } finally {
+      setUploadingFile(false);
+    }
   }
 
   async function handleSubmit() {
@@ -303,18 +362,8 @@ export function PrintMarketplace({
       return;
     }
 
-    if (!selectedFile) {
+    if (!selectedFile || !uploadedFiles.length || !detectedPageCount) {
       setError("Upload one document to continue.");
-      return;
-    }
-
-    if (!ACCEPTED_FILE_TYPES.includes(selectedFile.type)) {
-      setError("Only PDF, DOC, DOCX, PNG, and JPG files are allowed.");
-      return;
-    }
-
-    if (selectedFile.size > MAX_FILE_SIZE_BYTES) {
-      setError("File size must be under 15 MB.");
       return;
     }
 
@@ -327,19 +376,6 @@ export function PrintMarketplace({
     setError("");
 
     try {
-      const uploadPayload = new FormData();
-      uploadPayload.append("files", selectedFile);
-
-      const uploadResponse = await fetch("/api/uploads", {
-        method: "POST",
-        body: uploadPayload,
-      });
-      const uploadResult = await uploadResponse.json();
-
-      if (!uploadResponse.ok) {
-        throw new Error(uploadResult.error || "File upload failed.");
-      }
-
       const orderResponse = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -351,16 +387,15 @@ export function PrintMarketplace({
             category,
             printType,
             sideType,
-            pageCount,
+            pageCount: detectedPageCount,
             copies,
             estimateRupees,
             userNotes: notes,
           }),
           printType,
           sideType,
-          pageCount,
           copies,
-          files: uploadResult.files,
+          files: uploadedFiles,
         }),
       });
 
@@ -411,11 +446,16 @@ export function PrintMarketplace({
                     : "bg-gradient-to-t from-[rgba(24,18,14,0.86)] via-[rgba(24,18,14,0.28)] to-[rgba(24,18,14,0.08)]"
                 }`}
               />
+              {option.id === "other" ? (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <div className="translate-y-1 text-[8rem] font-semibold leading-none tracking-[-0.08em] text-white drop-shadow-[0_20px_40px_rgba(15,23,42,0.5)] sm:text-[9rem]">
+                    +
+                  </div>
+                </div>
+              ) : null}
               <div className="relative flex min-h-[260px] flex-col justify-between p-5 text-white sm:min-h-[300px]">
                 <div className="flex items-start justify-between gap-4">
-                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/18 text-sm font-bold tracking-[0.22em] backdrop-blur">
-                    {option.icon}
-                  </span>
+                  <span />
                   {isActive ? (
                     <span className="rounded-full bg-[#ffede0] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#9c4c20]">
                       Selected
@@ -435,26 +475,89 @@ export function PrintMarketplace({
         })}
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_380px]">
+      <section className="panel-strong overflow-hidden p-5 sm:p-6">
+        <div className="flex flex-col gap-6">
+          <div
+            className="relative overflow-hidden rounded-[28px] border border-[#e8d8ca] bg-cover bg-center p-5 text-white sm:p-6"
+            style={{ backgroundImage: `url(${categoryMeta.imageUrl})` }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-[rgba(28,20,16,0.92)] to-[rgba(28,20,16,0.42)]" />
+            <div className="relative flex flex-col gap-2">
+              <p className="eyebrow text-[#ffd8bd]">{categoryMeta.label}</p>
+              <h2 className="text-3xl font-semibold tracking-[-0.05em] sm:text-4xl">
+                Upload your document to continue
+              </h2>
+              <p className="max-w-xl text-sm leading-6 text-white/80 sm:text-base">
+                First pick what you want to print. Then upload one file. After that, we will show
+                print settings, nearby shops, and the final estimate.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <div className="rounded-[28px] border border-[#eadfd3] bg-white p-5">
+              <p className="label">Upload file</p>
+              <label className="mt-3 flex min-h-[150px] cursor-pointer flex-col justify-center rounded-[24px] border border-dashed border-[#d9cabc] bg-[#fff8f1] px-4 text-center transition hover:border-[#c96d38] hover:bg-[#fff3e8]">
+                <input
+                  type="file"
+                  accept={ACCEPTED_FILE_EXTENSIONS}
+                  onChange={handleFileChange}
+                  className="hidden"
+                  {...hydrationSafeProps}
+                />
+                <span className="text-base font-semibold text-slate-900">
+                  {selectedFile ? selectedFile.name : "Tap to upload one document"}
+                </span>
+                <span className="mt-2 text-xs text-[#7a6b5f]">PDF, PNG, JPG</span>
+                {uploadingFile ? (
+                  <span className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#9c4c20]">
+                    Uploading and counting pages...
+                  </span>
+                ) : null}
+                {hasUploadedFile ? (
+                  <span className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#1f6b43]">
+                    {detectedPageCount} pages detected
+                  </span>
+                ) : null}
+              </label>
+            </div>
+
+            <div className="rounded-[28px] border border-[#eadfd3] bg-[rgba(255,248,241,0.9)] p-5">
+              <p className="eyebrow">Flow</p>
+              <div className="mt-4 space-y-3 text-sm text-slate-700">
+                <p className={hasUploadedFile ? "font-semibold text-slate-900" : ""}>
+                  1. Category selected
+                </p>
+                <p className={hasUploadedFile ? "font-semibold text-slate-900" : "text-[#8e7d70]"}>
+                  2. File uploaded
+                </p>
+                <p className={hasUploadedFile ? "font-semibold text-slate-900" : "text-[#8e7d70]"}>
+                  3. Choose settings and shop
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {!hasUploadedFile ? (
+        <section className="panel p-6 text-center">
+          <p className="eyebrow">Next step locked</p>
+          <h3 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-900">
+            Upload the document first
+          </h3>
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+            Print settings, nearby shop selection, and pricing will appear after the file is
+            uploaded.
+          </p>
+        </section>
+      ) : null}
+
+      {hasUploadedFile ? (
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_380px]">
         <div className="space-y-6">
           <div className="panel-strong overflow-hidden p-5 sm:p-6">
             <div className="flex flex-col gap-6">
-              <div
-                className="relative overflow-hidden rounded-[28px] border border-[#e8d8ca] bg-cover bg-center p-5 text-white sm:p-6"
-                style={{ backgroundImage: `url(${categoryMeta.imageUrl})` }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-[rgba(28,20,16,0.92)] to-[rgba(28,20,16,0.42)]" />
-                <div className="relative flex flex-col gap-2">
-                  <p className="eyebrow text-[#ffd8bd]">{categoryMeta.label}</p>
-                  <h2 className="text-3xl font-semibold tracking-[-0.05em] sm:text-4xl">
-                    Customize and send your print order
-                  </h2>
-                  <p className="max-w-xl text-sm leading-6 text-white/80 sm:text-base">
-                    Pick the print style, upload one file, then choose the nearest shop.
-                  </p>
-                </div>
-              </div>
-
               <div className="grid gap-4 lg:grid-cols-2">
                 <div className="rounded-[28px] border border-[#eadfd3] bg-[rgba(255,248,241,0.84)] p-5">
                   <p className="label">Print type</p>
@@ -499,30 +602,7 @@ export function PrintMarketplace({
                 </div>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1.2fr]">
-                <div className="rounded-[28px] border border-[#eadfd3] bg-white p-5">
-                  <p className="label">Pages</p>
-                  <div className="mt-3 flex items-center justify-between rounded-full bg-[#f8eee4] p-2">
-                    <button
-                      type="button"
-                      onClick={() => setPageCount((current) => Math.max(1, current - 1))}
-                      className="nav-icon-btn"
-                      {...hydrationSafeProps}
-                    >
-                      -
-                    </button>
-                    <span className="text-xl font-semibold text-slate-900">{pageCount}</span>
-                    <button
-                      type="button"
-                      onClick={() => setPageCount((current) => current + 1)}
-                      className="nav-icon-btn"
-                      {...hydrationSafeProps}
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-
+              <div className="grid gap-4 lg:grid-cols-1">
                 <div className="rounded-[28px] border border-[#eadfd3] bg-white p-5">
                   <p className="label">Copies</p>
                   <div className="mt-3 flex items-center justify-between rounded-full bg-[#f8eee4] p-2">
@@ -546,23 +626,6 @@ export function PrintMarketplace({
                       +
                     </button>
                   </div>
-                </div>
-
-                <div className="rounded-[28px] border border-[#eadfd3] bg-white p-5">
-                  <p className="label">Upload file</p>
-                  <label className="mt-3 flex min-h-[116px] cursor-pointer flex-col justify-center rounded-[24px] border border-dashed border-[#d9cabc] bg-[#fff8f1] px-4 text-center">
-                    <input
-                      type="file"
-                      accept={ACCEPTED_FILE_EXTENSIONS}
-                      onChange={handleFileChange}
-                      className="hidden"
-                      {...hydrationSafeProps}
-                    />
-                    <span className="text-sm font-semibold text-slate-900">
-                      {selectedFile ? selectedFile.name : "Tap to upload one document"}
-                    </span>
-                    <span className="mt-2 text-xs text-[#7a6b5f]">PDF, DOC, DOCX, PNG, JPG</span>
-                  </label>
                 </div>
               </div>
 
@@ -675,21 +738,24 @@ export function PrintMarketplace({
         </div>
 
         <aside className="space-y-4 xl:sticky xl:top-5 xl:self-start">
-          <div className="panel-dark p-5">
-            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[#ffc89b]">
-              Live total
-            </p>
-            <p className="mt-3 text-4xl font-semibold tracking-[-0.05em]">
-              {formatCurrency(estimateRupees)}
-            </p>
-            <div className="mt-5 space-y-2 text-sm text-white/80">
-              <p>{categoryMeta.label}</p>
-              <p>{printType === "color" ? "Color" : "B/W"}</p>
-              <p>{sideType === "double_side" ? "Double side" : "Single side"}</p>
-              <p>
-                {pageCount} pages x {copies} copies
+          <div className="panel-dark relative overflow-hidden p-5">
+            <div className="pointer-events-none absolute inset-0 z-10 bg-[rgba(22,18,14,0.18)] backdrop-blur-[10px]" />
+            <div className="relative select-none blur-[7px]">
+              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[#ffc89b]">
+                Estimated total
               </p>
-              {category === "lab_manual" ? <p>Lab manual handling + Rs 50</p> : null}
+              <p className="mt-3 text-4xl font-semibold tracking-[-0.05em]">
+                {formatCurrency(estimateRupees)}
+              </p>
+              <div className="mt-5 space-y-2 text-sm text-white/80">
+                <p>{categoryMeta.label}</p>
+                <p>{printType === "color" ? "Color" : "B/W"}</p>
+                <p>{sideType === "double_side" ? "Double side" : "Single side"}</p>
+                <p>
+                  {detectedPageCount} pages x {copies} copies
+                </p>
+                {category === "lab_manual" ? <p>Lab manual handling + Rs 50</p> : null}
+              </div>
             </div>
           </div>
 
@@ -764,7 +830,8 @@ export function PrintMarketplace({
             </button>
           </div>
         </aside>
-      </section>
+        </section>
+      ) : null}
     </div>
   );
 }

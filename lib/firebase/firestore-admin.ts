@@ -248,6 +248,7 @@ function normalizeOrder(order: Order): Order {
 function normalizeOrderFile(file: OrderFile): OrderFile {
   return {
     ...file,
+    pageCount: Number(file.pageCount || 0),
     downloadedAt: file.downloadedAt || null,
     downloadedByOwnerId: file.downloadedByOwnerId || null,
   };
@@ -1118,6 +1119,7 @@ export async function createOrderWithFiles(params: {
       s3Url: file.s3Url,
       mimeType: file.mimeType,
       size: file.size,
+      pageCount: file.pageCount,
       downloadedAt: null,
       downloadedByOwnerId: null,
       createdAt: FieldValue.serverTimestamp(),

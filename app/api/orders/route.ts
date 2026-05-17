@@ -18,7 +18,6 @@ export async function POST(request: Request) {
       notes,
       printType,
       sideType,
-      pageCount,
       copies,
       files,
     } = await request.json();
@@ -38,7 +37,9 @@ export async function POST(request: Request) {
         typeof file.s3Key === "string" &&
         typeof file.s3Url === "string" &&
         typeof file.mimeType === "string" &&
-        typeof file.size === "number"
+        typeof file.size === "number" &&
+        Number.isInteger(file.pageCount) &&
+        Number(file.pageCount) > 0
       );
     });
 
@@ -61,7 +62,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const numericPageCount = Number(pageCount);
+    const numericPageCount = files.reduce(
+      (total, file) => total + Number(file.pageCount || 0),
+      0,
+    );
     if (!Number.isInteger(numericPageCount) || numericPageCount < 1) {
       return NextResponse.json({ error: "Page count must be at least 1." }, { status: 400 });
     }
