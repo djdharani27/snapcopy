@@ -2,6 +2,10 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import { getAdminAuth } from "@/lib/firebase/admin";
+import {
+  createFirebaseSessionCookie,
+  SESSION_COOKIE_MAX_AGE_SECONDS,
+} from "@/lib/auth/session-cookie";
 
 export const runtime = "nodejs";
 
@@ -13,20 +17,21 @@ export async function POST(request: Request) {
   }
 
   try {
-    await getAdminAuth().verifyIdToken(token);
+    const auth = getAdminAuth();
+    const sessionCookie = await createFirebaseSessionCookie(token, auth);
+
+    (await cookies()).set({
+      name: SESSION_COOKIE_NAME,
+      value: sessionCookie,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: SESSION_COOKIE_MAX_AGE_SECONDS,
+    });
   } catch {
     return NextResponse.json({ error: "Invalid token." }, { status: 401 });
   }
-
-  (await cookies()).set({
-    name: SESSION_COOKIE_NAME,
-    value: token,
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60,
-  });
 
   return NextResponse.json({ ok: true });
 }
